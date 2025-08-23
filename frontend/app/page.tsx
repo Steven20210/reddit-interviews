@@ -268,7 +268,7 @@ export default function InterviewSearchPage() {
         searchQuery === "" ||
         post.raw.toLowerCase().includes(searchQuery.toLowerCase()) ||
         post.summary.toLowerCase().includes(searchQuery.toLowerCase());
-
+      //fasdfasdfasdf
       const postRole = extractRoleFromPost(post);
       const matchesRole =
         roleFilter === "all" ||
