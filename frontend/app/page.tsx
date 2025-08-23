@@ -396,6 +396,36 @@ export default function InterviewSearchPage() {
           </div>
         </div>
 
+        {/* Disclaimer */}
+        <Card className="mb-6 border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/20">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 mt-0.5">
+                <div className="w-5 h-5 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center">
+                  <span className="text-orange-600 dark:text-orange-400 text-sm font-bold">
+                    !
+                  </span>
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-orange-800 dark:text-orange-200 mb-1">
+                  Important Disclaimer
+                </h3>
+                <p className="text-sm text-orange-700 dark:text-orange-300 leading-relaxed">
+                  This application is for{" "}
+                  <strong>educational and research purposes only</strong>. All
+                  interview experiences are collected from public Reddit posts
+                  and are user-generated content. Please respect Reddit's terms
+                  of service and API usage guidelines. The information provided
+                  may not be accurate, complete, or up-to-date. Always verify
+                  information from official sources and consult with
+                  professionals for career advice.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Search and Filters */}
         <Card className="mb-8">
           <CardContent className="p-6">
