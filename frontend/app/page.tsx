@@ -1,5 +1,5 @@
 "use client";
-
+import { Analytics } from "@vercel/analytics/next";
 import { useEffect, useState, useMemo } from "react";
 import {
   Search,
