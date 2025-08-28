@@ -53,18 +53,58 @@ LEETCODE_PATTERN = re.compile(r"""
 )\b
 """, re.IGNORECASE | re.VERBOSE)
 
+# Major tech companies for interview experience searches
+COMPANIES = [
+    # FAANG+ Companies
+    # "Apple", "Google", "Meta", "Amazon", "Microsoft", "Netflix", "Tesla",
+    
+    # Cloud & Enterprise Software
+    # "Salesforce", "Oracle", "Adobe"
+    
+    # # AI & Data
+    # "Palantir"
+    
+    # # Social Media & Communication
+    # "Twitter", "LinkedIn", "Snapchat", "Discord", "Slack", "Zoom",
+    
+    # # E-commerce & Fintech
+    "Shopify", "Stripe", "Square", "PayPal", "DoorDash", "Instacart", "Airbnb",
+    
+    # # Gaming & Entertainment
+    # "Roblox", "Unity", "Epic Games", "Twitch", "Spotify", "Pinterest",
+    
+    # # Hardware & Semiconductor
+    # "Intel", "NVIDIA", "AMD", "Qualcomm", "Cisco", "IBM",
+    
+    # # Developer Tools & Platforms
+    # "GitHub", "GitLab", "Hashicorp", "Docker", "JetBrains", "Stack Overflow",
+    
+    # # Emerging Tech
+    # "SpaceX", "Coinbase", "Robinhood", "Uber",
+    
+    # # Chinese Tech Giants
+    # "Alibaba", "Tencent", "Baidu", "ByteDance"
+]
+
 QUERIES = [
+    # Company-specific interview experience queries
+    # "palantir interview"
+    # *[f'"{company} interview" experience' for company in COMPANIES],
+    # # General interview experience queries (keeping some original ones)
     '(title:"interview" OR title:"experience") AND title:(oa OR onsite OR final OR phone OR screening)',
     '(title:"interview" OR title:"experience") AND title:(oa OR hackerrank OR leetcode OR coding)',
     '(title:"interview" OR title:"experience") AND title:("system design" OR architecture OR hld OR lld)',
-    '(title:"interview" OR title:"experience") AND title:(behavioral OR "leadership principles" OR hr OR recruiter)',
-    '(title:"interview" OR title:"experience") AND title:(intern OR internship OR "new grad" OR campus)',
-    '(title:"interview" OR title:"experience") AND title:(phone OR recruiter OR screening OR first OR initial)',
-    '(title:"interview" OR title:"experience") AND title:(onsite OR "final round" OR panel OR loop)',
-    '(title:"interview" OR title:"experience") AND title:(round OR screening OR final OR onsite OR oa OR phone) -AM -trading -crypto',
-    '(title:"interview" OR title:"experience") AND title:(SDE OR engineer OR "software dev" OR "data engineer")',
-    'title:(interview OR experience OR onsite OR oa OR "phone screen" OR "final round")'
+    # '(title:"interview" OR title:"experience") AND title:(behavioral OR "leadership principles" OR hr OR recruiter)',
+    # '(title:"interview" OR title:"experience") AND title:(intern OR internship OR "new grad" OR campus)',
+    # '(title:"interview" OR title:"experience") AND title:(phone OR recruiter OR screening OR first OR initial)',
+    # '(title:"interview" OR title:"experience") AND title:(onsite OR "final round" OR panel OR loop)',
+    # '(title:"interview" OR title:"experience") AND title:(round OR screening OR final OR onsite OR oa OR phone) -AM -trading -crypto',
+    # '(title:"interview" OR title:"experience") AND title:(SDE OR engineer OR "software dev" OR "data engineer")',
+    # 'title:(interview OR experience OR onsite OR oa OR "phone screen" OR "final round")'
 ]
+
+# for company in COMPANIES:
+#     QUERIES.append(f"{company} interview experience")
 
 def get_reddit_instance():
     return praw.Reddit(
@@ -83,16 +123,32 @@ def score_post(text):
     total_matches = len(flat_matches)  # total number of matches including duplicates
     return score, total_matches
 
-def fetch_and_store_posts(minlength=400, score_threshold=5, time_filter='year'):
+def fetch_and_store_posts(minlength=400, score_threshold=3, time_filter='year'):
     reddit = get_reddit_instance()
     all_data = []
     for subreddit_name in SUBREDDITS:
         subreddit = reddit.subreddit(subreddit_name)
         for query in QUERIES:
-            posts = subreddit.search(query, sort='new', time_filter=time_filter, limit=1000)
+            posts = subreddit.search(query, sort='top', time_filter=time_filter, limit=100)
             for post in posts:
-                if len(post.selftext) < minlength:
-                    continue
+                # Fetch top 3 comments for this post
+                post.comment_sort = 'top'  # Sort comments by top
+                post.comment_limit = 3     # Limit to top 3 comments
+                post.comments.replace_more(limit=0)  # Don't expand "more comments" links
+                
+                comments_data = []
+                for comment in post.comments[:3]:  # Get top 3 comments
+                    if hasattr(comment, 'body') and comment.body and comment.body != '[deleted]':
+                        comment_data = {
+                            "comment_id": comment.id,
+                            "body": comment.body,
+                            "author": str(comment.author) if comment.author else "[deleted]",
+                            "score": comment.score,
+                            "created_utc": comment.created_utc,
+                            "permalink": f"https://reddit.com{comment.permalink}"
+                        }
+                        comments_data.append(comment_data)
+                
                 post_data = {
                     "subreddit": subreddit_name,
                     "post_id": post.id,
@@ -102,13 +158,10 @@ def fetch_and_store_posts(minlength=400, score_threshold=5, time_filter='year'):
                     "author": str(post.author),
                     "url": post.url,
                     "num_comments": post.num_comments,
-                    "comments": []
+                    "comments": comments_data
                 }
-                matches = re.findall(LEETCODE_PATTERN, post.selftext)
-                _, total_matches = score_post(post.selftext)
+                all_data.append(post_data)
 
-                if len(matches) > 0 or total_matches >= score_threshold or len(post.selftext) >= minlength:
-                    all_data.append(post_data)
     output_path = "reddit_data.json"
     # Try to load existing array, else start new
     if os.path.exists(output_path):
@@ -126,6 +179,7 @@ def fetch_and_store_posts(minlength=400, score_threshold=5, time_filter='year'):
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(existing, f, ensure_ascii=False, indent=2)
     deduplicate_reddit_data_file()
+    create_summaries_for_all_posts()
 
 def deduplicate_json_list(json_list, hash_file="hashes.txt"):
     """
@@ -170,7 +224,7 @@ def deduplicate_reddit_data_file(input_file="reddit_data.json", hash_file="hashe
 if __name__ == "__main__":
     fetch_and_store_posts(time_filter='day')   # fetches today's posts
     fetch_and_store_posts(time_filter='week')  # fetches this week's posts
-    fetch_and_store_posts(time_filter='month') # fetches this month's posts
-    fetch_and_store_posts(time_filter='year')  # fetches this year's posts
-    fetch_and_store_posts(time_filter='all')  # fetches all posts
-    create_summaries_for_all_posts()
+    # fetch_and_store_posts(time_filter='month') # fetches this month's posts
+    # fetch_and_store_posts(time_filter='year')  # fetches this year's posts
+    # fetch_and_store_posts(time_filter='month')  # fetches all posts
+    # create_summaries_for_all_posts()

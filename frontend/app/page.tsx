@@ -268,7 +268,7 @@ export default function InterviewSearchPage() {
         searchQuery === "" ||
         post.raw.toLowerCase().includes(searchQuery.toLowerCase()) ||
         post.summary.toLowerCase().includes(searchQuery.toLowerCase());
-      //fasdfasdfasdf
+
       const postRole = extractRoleFromPost(post);
       const matchesRole =
         roleFilter === "all" ||
@@ -492,19 +492,21 @@ export default function InterviewSearchPage() {
                   Clear Filters
                 </Button>
 
-                <Button
-                  variant="default"
-                  onClick={fetchNewPosts}
-                  disabled={isFetching}
-                  className="h-10"
-                >
-                  <RefreshCw
-                    className={`h-4 w-4 mr-2 ${
-                      isFetching ? "animate-spin" : ""
-                    }`}
-                  />
-                  {isFetching ? "Fetching..." : "Fetch New Posts"}
-                </Button>
+                {process.env.NODE_ENV !== "production" && (
+                  <Button
+                    variant="default"
+                    onClick={fetchNewPosts}
+                    disabled={isFetching}
+                    className="h-10"
+                  >
+                    <RefreshCw
+                      className={`h-4 w-4 mr-2 ${
+                        isFetching ? "animate-spin" : ""
+                      }`}
+                    />
+                    {isFetching ? "Fetching..." : "Fetch New Posts"}
+                  </Button>
+                )}
               </div>
             </div>
           </CardContent>

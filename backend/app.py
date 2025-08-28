@@ -36,8 +36,10 @@ async def fetch_reddit_posts():
         logger.info("Starting Reddit post fetch process...")
         
         # Fetch posts from different time periods
-        fetch_and_store_posts(time_filter='day')   # fetches today's posts
-        fetch_and_store_posts(time_filter='week')  # fetches this week's posts
+        # fetch_and_store_posts(time_filter='week')   # fetches today's posts
+        fetch_and_store_posts(time_filter='month')  # fetches this week's posts
+        # fetch_and_store_posts(time_filter='year')
+        # fetch_and_store_posts(time_filter='day')
         
         logger.info("Reddit posts fetched successfully, now creating summaries...")
         
