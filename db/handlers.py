@@ -45,6 +45,8 @@ class Post(Document):
 class SummarizedPost(Document):
     url = StringField(required=True, unique=True)
     hash = StringField(required=True)
+    company = StringField(required=True)
+    role = StringField(required=True)
     summary = StringField(required=True)
     raw_post = StringField(required=True)
     payload = DictField(required=False)
@@ -57,7 +59,7 @@ class SummarizedPost(Document):
     }
 
     @classmethod
-    def upsert_post(cls, url: str, summary: str, raw_post: str, new_hash: str) -> None:
+    def upsert_post(cls, url: str, summary: str, raw_post: str, new_hash: str, role: str, company: str) -> None:
         existing = cls.objects(url=url).first()
         if existing:
             if existing.hash != new_hash:
@@ -66,9 +68,12 @@ class SummarizedPost(Document):
                 existing.save()
                 print(f"Replaced existing summarized post with new hash: {url}")
             else:
+                existing.role = role
+                existing.company = company
+                existing.save()
                 print(f"Summarized post already exists with same hash: {url}")
         else:
             logging.info(f"Upserting summarized post with URL: {url} and hash: {new_hash}")
-            cls(url=url, hash=new_hash, summary=summary, raw_post=raw_post).save()
+            cls(url=url, hash=new_hash, summary=summary, raw_post=raw_post, role=role, company=company).save()
             print(f"Inserted new summarized post: {url}")
     

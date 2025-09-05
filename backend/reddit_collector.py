@@ -7,7 +7,7 @@ from collections import Counter
 from backend.ai_processing import create_summaries_for_all_posts
 import hashlib
 from aqs.queue_handlers import enqueue_post, ensure_queue_exists
-from db.handlers import Post
+from db.handlers import Post, SummarizedPost
 import logging
 load_dotenv()
 
@@ -167,3 +167,4 @@ def fetch_and_store_posts(time_filter):
                 all_data.append(post_data)
                 enqueue_post(queue_client, Post, post.url, post_data, hashlib.sha256(json.dumps(post_data, sort_keys=True).encode("utf-8")).hexdigest())
     create_summaries_for_all_posts(queue_client)
+

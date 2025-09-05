@@ -1,6 +1,6 @@
 "use client";
 import { Analytics } from "@vercel/analytics/next";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import {
   Search,
   Building2,
@@ -19,150 +19,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { set } from "date-fns";
 
+// ---------------------------------------------
+// Types
+// ---------------------------------------------
 interface InterviewPost {
   raw: string;
   summary: string;
   url: string;
+  company?: string;
+  role?: string;
 }
 
-const extractCompanyFromPost = (post: InterviewPost): string => {
-  // Try structured format first
-  const structuredMatch = post.summary.match(/• Company: (.+)/i);
-  if (structuredMatch) return structuredMatch[1].trim();
-
-  const companies = [
-    "Amazon",
-    "Google",
-    "Microsoft",
-    "Meta",
-    "Apple",
-    "Netflix",
-    "Tesla",
-    "Uber",
-    "Airbnb",
-    "Spotify",
-    "Twitter",
-    "LinkedIn",
-    "Salesforce",
-    "Oracle",
-    "IBM",
-    "Intel",
-    "NVIDIA",
-    "Adobe",
-    "Shopify",
-    "Stripe",
-    "Coinbase",
-    "Palantir",
-    "Databricks",
-    "Snowflake",
-    "TikTok",
-  ];
-
-  // Search only in summary text, match whole words only
-  const summaryText = post.summary.toLowerCase();
-  for (const company of companies) {
-    const companyLower = company.toLowerCase();
-    const regex = new RegExp(`\\b${companyLower}\\b`, "i");
-    if (regex.test(summaryText)) {
-      return company;
-    }
-  }
-
-  // If not found in summary, return Unknown
-  return "Unknown";
+type ApiResponse = {
+  posts: InterviewPost[];
+  companies: string[];
+  roles: string[];
+  total: number;
+  page: number;
+  limit: number;
 };
 
-const extractRoleFromPost = (post: InterviewPost): string => {
-  // Patterns for normalization
-  const rolePatterns = [
-    {
-      regex:
-        /sde[\s\-]?i\b|sde[\s\-]?1\b|sdei\b|sde1\b|software engineer[\s\-]?i\b|software engineer[\s\-]?1\b/i,
-      norm: "SDE I",
-    },
-    {
-      regex:
-        /sde[\s\-]?ii\b|sde[\s\-]?2\b|sdeii\b|sde2\b|software engineer[\s\-]?ii\b|software engineer[\s\-]?2\b/i,
-      norm: "SDE II",
-    },
-    {
-      regex:
-        /sde[\s\-]?iii\b|sde[\s\-]?3\b|sdeiii\b|sde3\b|software engineer[\s\-]?iii\b|software engineer[\s\-]?3\b/i,
-      norm: "SDE III",
-    },
-    { regex: /sde[\s\-]?intern|software engineer intern/i, norm: "SDE Intern" },
-    { regex: /swe[\s\-]?intern/i, norm: "SWE Intern" },
-    { regex: /software engineer/i, norm: "Software Engineer" },
-    { regex: /software developer/i, norm: "Software Developer" },
-    { regex: /backend engineer/i, norm: "Backend Engineer" },
-    { regex: /frontend engineer/i, norm: "Frontend Engineer" },
-    { regex: /full[\s\-]?stack engineer/i, norm: "Full Stack Engineer" },
-    { regex: /data scientist/i, norm: "Data Scientist" },
-    { regex: /data engineer/i, norm: "Data Engineer" },
-    { regex: /product manager/i, norm: "Product Manager" },
-    { regex: /engineering manager/i, norm: "Engineering Manager" },
-    { regex: /l\d+/i, norm: "Google L Level" },
-    { regex: /e\d+/i, norm: "Meta E Level" },
-    { regex: /new grad/i, norm: "New Grad" },
-    { regex: /intern/i, norm: "Intern" },
-  ];
+// ---------------------------------------------
+// Utilities
+// ---------------------------------------------
+const parseBoldPatterns = (text: string): string =>
+  text ? text.replace(/\*\*[^*]+\*\*/g, "") : "";
 
-  // Try structured format first
-  const structuredMatch = post.summary.match(/• Role: (.+)/i);
-  let roleRaw = structuredMatch ? structuredMatch[1].trim() : "";
-  let role = "";
-
-  // If roleRaw contains multiple roles (e.g., "Intern & New Grad"), split and normalize each
-  if (roleRaw) {
-    // Split on common delimiters
-    const roleParts = roleRaw
-      .split(/[,/&]| and |\s*\+\s*/i)
-      .map((r) => r.trim())
-      .filter(Boolean);
-    const normalizedRoles = [];
-    for (const part of roleParts) {
-      let found = false;
-      for (const { regex, norm } of rolePatterns) {
-        if (part.match(regex)) {
-          normalizedRoles.push(norm);
-          found = true;
-          break;
-        }
-      }
-      if (!found) normalizedRoles.push(part);
-    }
-    // Prioritize summary roles, join with ' & ' if multiple
-    role = normalizedRoles.length > 0 ? normalizedRoles.join(" & ") : roleRaw;
-  } else {
-    // Only look in raw if summary role is missing
-    const fullText = post.raw;
-    for (const { regex, norm } of rolePatterns) {
-      if (fullText.match(regex)) {
-        role = norm;
-        break;
-      }
-    }
-  }
-
-  return role || "Unknown";
-};
-
-// Utility function to remove bold patterns from text
-const parseBoldPatterns = (text: string): string => {
-  if (!text) return text;
-
-  // Remove all **word** patterns from the text
-  return text.replace(/\*\*[^*]+\*\*/g, "");
-};
-
-type BoldTextProps = {
-  text: string;
-};
-
-export function BoldText({ text }: BoldTextProps) {
+export function BoldText({ text }: { text: string }) {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
-
   return (
     <>
       {parts.map((part, i) =>
@@ -176,47 +62,86 @@ export function BoldText({ text }: BoldTextProps) {
   );
 }
 
+// ---------------------------------------------
+// Component
+// ---------------------------------------------
 export default function InterviewSearchPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [companyFilter, setCompanyFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
   const [posts, setPosts] = useState<InterviewPost[]>([]);
+  const [companies, setCompanies] = useState<string[]>([]);
+  const [roles, setRoles] = useState<string[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+
   const [isFetching, setIsFetching] = useState(false);
   const [fetchStatus, setFetchStatus] = useState<string>("");
   const [message, setMessage] = useState("Loading...");
 
-  // Debounce timer
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      fetchPosts();
-    }, 500); // wait 500ms after typing stops
-
-    return () => clearTimeout(handler); // cleanup previous timer
-  }, [searchQuery]); // 👈 runs only when searchQuery changes
-
-  // Run fetchPosts immediately when filters change
-  useEffect(() => {
-    fetchPosts();
-  }, [companyFilter, roleFilter]);
-
+  // ---------------------------------------------
+  // Fetch posts from backend
+  // ---------------------------------------------
   const fetchPosts = async () => {
     try {
-      const params = new URLSearchParams();
-      if (searchQuery) params.append("q", searchQuery);
-      if (companyFilter !== "all") params.append("company", companyFilter);
-      if (roleFilter !== "all") params.append("role", roleFilter);
-
-      const res = await fetch(
-        `http://localhost:8000/search?${params.toString()}`
-      );
+      const page = currentPage.toString();
+      const res = await fetch("http://localhost:8001/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: searchQuery,
+          company: companyFilter,
+          role: roleFilter,
+          page: page,
+          limit: 10,
+        }),
+      });
+      if (!res.ok) throw new Error(`Error: ${res.status}`);
       const data = await res.json();
-      setPosts(data.posts);
+      // 🔑 Parse raw backend results into what the frontend expects
+      const posts: InterviewPost[] = (data.results ?? []).map((item: any) => ({
+        raw: item.raw_post ?? "",
+        summary: item.summary ?? "",
+        url: item.url ?? "#",
+        company: item.company ?? "Unknown",
+        role: item.role ?? "Unknown",
+      }));
+      setCompanies(posts.map((p) => p.company || "Unknown"));
+      setRoles(posts.map((p) => p.role || "Unknown"));
+
+      const total = data.total ?? posts.length;
+      const limit = data.limit ?? 10;
+
+      console.log("Fetched posts:", { posts, companies, roles, total, limit });
+
+      setPosts(posts);
+      setTotalPages(Math.min(10, Math.ceil(total / limit)));
     } catch (err) {
       console.error("Failed to fetch posts", err);
+      setMessage("Error loading posts");
     }
   };
 
-  // Function to fetch new Reddit posts
+  // ---------------------------------------------
+  // Triggers
+  // ---------------------------------------------
+  // Debounce search
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setCurrentPage(1); // reset page on new search
+      fetchPosts();
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  // Immediate fetch on filter/page change
+  useEffect(() => {
+    fetchPosts();
+  }, [companyFilter, roleFilter, currentPage]);
+
+  // ---------------------------------------------
+  // Fetch new Reddit posts (admin/dev only)
+  // ---------------------------------------------
   const fetchNewPosts = async () => {
     setIsFetching(true);
     setFetchStatus("Fetching new Reddit posts...");
@@ -224,24 +149,17 @@ export default function InterviewSearchPage() {
     try {
       const response = await fetch(
         "http://localhost:8000/api/fetch-reddit-posts",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
+        { method: "POST", headers: { "Content-Type": "application/json" } }
       );
 
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(`HTTP error! status: ${response.status}`);
-      }
 
       const result = await response.json();
       setFetchStatus(
         `Success! Fetched ${result.reddit_posts_count} posts and created ${result.summaries_count} summaries.`
       );
 
-      // Reload the data after successful fetch
       setTimeout(() => {
         window.location.reload();
       }, 2000);
@@ -257,109 +175,14 @@ export default function InterviewSearchPage() {
     }
   };
 
-  // Companies are only from currently filtered posts (by role and search)
-  const companies = useMemo(() => {
-    // Count interviews per company in filtered posts
-    const companyCounts: Record<string, number> = {};
-    const filtered = posts.filter((post) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        post.raw.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        post.summary.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const postRole = extractRoleFromPost(post);
-      const matchesRole =
-        roleFilter === "all" ||
-        postRole.toLowerCase().includes(roleFilter.toLowerCase()) ||
-        roleFilter.toLowerCase().includes(postRole.toLowerCase());
-
-      return matchesSearch && matchesRole;
-    });
-    filtered.forEach((post) => {
-      const company = extractCompanyFromPost(post);
-      if (company !== "Unknown") {
-        companyCounts[company] = (companyCounts[company] || 0) + 1;
-      }
-    });
-    // Only include companies with at least one interview
-    return Object.keys(companyCounts).sort();
-  }, [posts, searchQuery, roleFilter]);
-
-  // (removed duplicate filteredPosts declaration)
-
-  const roles = useMemo(() => {
-    const rolesSet = new Set<string>();
-    const filtered = posts.filter((post) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        post.raw.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        post.summary.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const postCompany = extractCompanyFromPost(post);
-      const matchesCompany =
-        companyFilter === "all" ||
-        postCompany.toLowerCase() === companyFilter.toLowerCase();
-
-      return matchesSearch && matchesCompany;
-    });
-
-    filtered.forEach((post) => {
-      const role = extractRoleFromPost(post);
-      if (role !== "Unknown") rolesSet.add(role);
-    });
-
-    return Array.from(rolesSet).sort();
-  }, [posts, searchQuery, companyFilter]);
-
-  const filteredPosts = useMemo(() => {
-    return posts.filter((post) => {
-      const matchesSearch =
-        searchQuery === "" ||
-        post.raw.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        post.summary.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const postCompany = extractCompanyFromPost(post);
-      const matchesCompany =
-        companyFilter === "all" ||
-        postCompany.toLowerCase() === companyFilter.toLowerCase();
-
-      const postRole = extractRoleFromPost(post);
-      const matchesRole =
-        roleFilter === "all" ||
-        postRole.toLowerCase().includes(roleFilter.toLowerCase()) ||
-        roleFilter.toLowerCase().includes(postRole.toLowerCase());
-
-      return matchesSearch && matchesCompany && matchesRole;
-    });
-  }, [posts, searchQuery, companyFilter, roleFilter]);
-
-  const getCompanyForDisplay = (post: InterviewPost) => {
-    return extractCompanyFromPost(post);
-  };
-
-  const getRoleForDisplay = (post: InterviewPost) => {
-    return extractRoleFromPost(post);
-  };
-
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const postsPerPage = 10;
-  const totalPages = useMemo(
-    () => Math.min(10, Math.ceil(filteredPosts.length / postsPerPage)),
-    [filteredPosts]
+  // ---------------------------------------------
+  // UI
+  // ---------------------------------------------
+  const [expandedPosts, setExpandedPosts] = useState<Record<number, boolean>>(
+    {}
   );
-  const paginatedPosts: InterviewPost[] = useMemo(() => {
-    const startIdx = (currentPage - 1) * postsPerPage;
-    return filteredPosts.slice(startIdx, startIdx + postsPerPage);
-  }, [filteredPosts, currentPage]);
-
-  // State to track expanded posts
-  const [expandedPosts, setExpandedPosts] = useState<{
-    [key: number]: boolean;
-  }>({});
-  const toggleExpand = (index: number) => {
+  const toggleExpand = (index: number) =>
     setExpandedPosts((prev) => ({ ...prev, [index]: !prev[index] }));
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -371,7 +194,6 @@ export default function InterviewSearchPage() {
               <h1 className="text-4xl font-bold text-foreground mb-2">
                 Interview Experience Search
               </h1>
-              <h1>{message}</h1>
             </div>
             <div className="mb-2 flex items-center justify-center gap-2">
               <img
@@ -420,11 +242,11 @@ export default function InterviewSearchPage() {
           </CardContent>
         </Card>
 
-        {/* Search and Filters */}
+        {/* Search + Filters */}
         <Card className="mb-8">
           <CardContent className="p-6">
             <div className="flex flex-col gap-4">
-              {/* Search Input */}
+              {/* Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
@@ -448,7 +270,7 @@ export default function InterviewSearchPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Companies</SelectItem>
-                      {companies.map((company) => (
+                      {(companies ?? []).map((company) => (
                         <SelectItem key={company} value={company}>
                           {company}
                         </SelectItem>
@@ -465,7 +287,7 @@ export default function InterviewSearchPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Roles</SelectItem>
-                      {roles.map((role) => (
+                      {(roles ?? []).map((role) => (
                         <SelectItem key={role} value={role}>
                           {role}
                         </SelectItem>
@@ -526,8 +348,8 @@ export default function InterviewSearchPage() {
         {/* Results Count */}
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <p className="text-muted-foreground">
-            Showing {filteredPosts.length} of {posts.length} interview
-            experiences
+            Showing {(posts ?? []).length} posts (page {currentPage} of{" "}
+            {totalPages})
           </p>
           {totalPages > 1 && (
             <div className="flex items-center gap-2">
@@ -551,7 +373,7 @@ export default function InterviewSearchPage() {
 
         {/* Results */}
         <div className="space-y-6">
-          {paginatedPosts.length === 0 ? (
+          {(posts ?? []).length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center">
                 <p className="text-muted-foreground text-lg">
@@ -563,9 +385,8 @@ export default function InterviewSearchPage() {
               </CardContent>
             </Card>
           ) : (
-            paginatedPosts.map((post: InterviewPost, index: number) => {
-              // Use global index for expandedPosts
-              const globalIndex = (currentPage - 1) * postsPerPage + index;
+            posts.map((post: InterviewPost, index: number) => {
+              const globalIndex = (currentPage - 1) * 10 + index;
               return (
                 <Card
                   key={globalIndex}
@@ -579,14 +400,14 @@ export default function InterviewSearchPage() {
                           className="flex items-center gap-1"
                         >
                           <Building2 className="h-3 w-3" />
-                          {getCompanyForDisplay(post)}
+                          {post.company || "Unknown"}
                         </Badge>
                         <Badge
                           variant="outline"
                           className="flex items-center gap-1"
                         >
                           <Briefcase className="h-3 w-3" />
-                          {getRoleForDisplay(post)}
+                          {post.role || "Unknown"}
                         </Badge>
                       </div>
                       <Button variant="ghost" size="sm" asChild>
@@ -645,7 +466,8 @@ export default function InterviewSearchPage() {
           )}
         </div>
       </div>
-      {/* Disclaimer */}
+
+      {/* Footer Disclaimer */}
       <div className="mt-12 text-center text-xs text-muted-foreground">
         <hr className="my-4" />
         <p>
