@@ -5,3 +5,5 @@ praw
 openai
 apscheduler
 python-dotenv
+mongoengine
+azure-storage-queue

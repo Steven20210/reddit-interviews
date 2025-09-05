@@ -20,28 +20,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Sample data - replace with your actual data source
-const samplePosts = [
-  {
-    raw: "Should I expect a interview call from Amazon for sde intern role as I filled up the form and they sent me oa ?There is a opening for sde intern role at Amazon so I filled up being 2025 grad and immediately received the oa link . I gave the oa and it went good like completed in 20 mins .\nSo should I expect a interview call or not ?",
-    summary:
-      "• Company: Amazon\n• Role: SDE Intern\n• Interview experience: \n  - Received OA link immediately after filling the form\n  - Completed OA in 20 minutes and it went well",
-    url: "https://www.reddit.com/r/leetcode/comments/1gg9wnq/should_i_expect_a_interview_call_from_amazon_for/",
-  },
-  {
-    raw: "Amazon: Got rejection after 2 hours of virtual onsite interviewToday, i got interviewed for SDE-1 at amazon. I cleared all codings given and answered all LP principles well. Interviewers are also impressed.\n\nBut i got rejection after 2 hours of completing all three interviews. I reached out to the recruiter no response.\n\nWhat is this, what's wrong.",
-    summary:
-      "• The interview was a virtual onsite interview.\n• It lasted for 2 hours.\n• The candidate cleared all coding given and answered all LP (likely LeetCode) principles well.\n• The interviewers were impressed.\n• The candidate received a rejection after completing all three interviews.\n• The candidate reached out to the recruiter but received no response.",
-    url: "https://i.redd.it/wa1rs7cg58yd1.jpeg",
-  },
-  {
-    raw: "Google L4 Software Engineer interview process was intense but fair. Had 4 rounds including system design and coding. The interviewers were really helpful and gave hints when I was stuck.",
-    summary:
-      "• Company: **<Google>**\n• Role: **<L4 Software Engineer>**\n• Interview experience: \n  - **<4 rounds>** total\n  - System design and coding rounds\n  - Helpful interviewers who provided hints",
-    url: "https://www.reddit.com/r/cscareerquestions/example1",
-  },
-];
-
 interface InterviewPost {
   raw: string;
   summary: string;
@@ -178,45 +156,65 @@ const parseBoldPatterns = (text: string): string => {
   return text.replace(/\*\*[^*]+\*\*/g, "");
 };
 
+type BoldTextProps = {
+  text: string;
+};
+
+export function BoldText({ text }: BoldTextProps) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.startsWith("**") && part.endsWith("**") ? (
+          <strong key={i}>{part.slice(2, -2)}</strong>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
 export default function InterviewSearchPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [companyFilter, setCompanyFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [posts, setPosts] = useState<InterviewPost[]>(samplePosts);
+  const [posts, setPosts] = useState<InterviewPost[]>([]);
   const [isFetching, setIsFetching] = useState(false);
   const [fetchStatus, setFetchStatus] = useState<string>("");
+  const [message, setMessage] = useState("Loading...");
+
+  // Debounce timer
   useEffect(() => {
-    console.log(
-      "InterviewSearchPage mounted, starting fetch for filtered_summaries.json"
-    );
-    fetch("/filtered_summaries.json")
-      .then((res) => {
-        console.log("Fetched filtered_summaries.json, status:", res.status);
-        if (!res.ok) {
-          console.error("Fetch failed with status:", res.status);
-        }
-        return res.json();
-      })
-      .then((data) => {
-        console.log("Loaded data from filtered_summaries.json:", data);
-        if (!Array.isArray(data)) {
-          console.error("filtered_summaries.json is not an array:", data);
-        } else {
-          console.log(`filtered_summaries.json contains ${data.length} items.`);
-        }
-        setPosts(data);
-        // Log first 3 items for inspection
-        if (Array.isArray(data)) {
-          data.slice(0, 3).forEach((item, idx) => {
-            console.log(`Post[${idx}]:`, item);
-          });
-        }
-      })
-      .catch((err) => {
-        console.error("Error loading filtered_summaries.json:", err);
-        setPosts([]);
-      });
-  }, []);
+    const handler = setTimeout(() => {
+      fetchPosts();
+    }, 500); // wait 500ms after typing stops
+
+    return () => clearTimeout(handler); // cleanup previous timer
+  }, [searchQuery]); // 👈 runs only when searchQuery changes
+
+  // Run fetchPosts immediately when filters change
+  useEffect(() => {
+    fetchPosts();
+  }, [companyFilter, roleFilter]);
+
+  const fetchPosts = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (searchQuery) params.append("q", searchQuery);
+      if (companyFilter !== "all") params.append("company", companyFilter);
+      if (roleFilter !== "all") params.append("role", roleFilter);
+
+      const res = await fetch(
+        `http://localhost:8000/search?${params.toString()}`
+      );
+      const data = await res.json();
+      setPosts(data.posts);
+    } catch (err) {
+      console.error("Failed to fetch posts", err);
+    }
+  };
 
   // Function to fetch new Reddit posts
   const fetchNewPosts = async () => {
@@ -289,7 +287,6 @@ export default function InterviewSearchPage() {
 
   // (removed duplicate filteredPosts declaration)
 
-  // Roles are only from currently filtered posts (by company and search)
   const roles = useMemo(() => {
     const rolesSet = new Set<string>();
     const filtered = posts.filter((post) => {
@@ -303,20 +300,16 @@ export default function InterviewSearchPage() {
         companyFilter === "all" ||
         postCompany.toLowerCase() === companyFilter.toLowerCase();
 
-      const postRole = extractRoleFromPost(post);
-      const matchesRole =
-        roleFilter === "all" ||
-        postRole.toLowerCase().includes(roleFilter.toLowerCase()) ||
-        roleFilter.toLowerCase().includes(postRole.toLowerCase());
-
-      return matchesSearch && matchesCompany && matchesRole;
+      return matchesSearch && matchesCompany;
     });
+
     filtered.forEach((post) => {
       const role = extractRoleFromPost(post);
       if (role !== "Unknown") rolesSet.add(role);
     });
+
     return Array.from(rolesSet).sort();
-  }, [posts, searchQuery, companyFilter, roleFilter]);
+  }, [posts, searchQuery, companyFilter]);
 
   const filteredPosts = useMemo(() => {
     return posts.filter((post) => {
@@ -378,6 +371,7 @@ export default function InterviewSearchPage() {
               <h1 className="text-4xl font-bold text-foreground mb-2">
                 Interview Experience Search
               </h1>
+              <h1>{message}</h1>
             </div>
             <div className="mb-2 flex items-center justify-center gap-2">
               <img
@@ -639,7 +633,7 @@ export default function InterviewSearchPage() {
                               expandedPosts[globalIndex] ? "" : "line-clamp-3"
                             }`}
                           >
-                            {post.raw}
+                            <BoldText text={post.raw} />
                           </p>
                         </div>
                       </div>

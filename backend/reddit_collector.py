@@ -4,9 +4,11 @@ from dotenv import load_dotenv
 import re
 import json 
 from collections import Counter
-from ai_processing import create_summaries_for_all_posts
+from backend.ai_processing import create_summaries_for_all_posts
 import hashlib
-
+from aqs.queue_handlers import enqueue_post, ensure_queue_exists
+from db.handlers import Post
+import logging
 load_dotenv()
 
 REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
@@ -88,12 +90,12 @@ COMPANIES = [
 
 QUERIES = [
     # Company-specific interview experience queries
-    # "palantir interview"
+    "palantir"
     # *[f'"{company} interview" experience' for company in COMPANIES],
     # # General interview experience queries (keeping some original ones)
-    '(title:"interview" OR title:"experience") AND title:(oa OR onsite OR final OR phone OR screening)',
-    '(title:"interview" OR title:"experience") AND title:(oa OR hackerrank OR leetcode OR coding)',
-    '(title:"interview" OR title:"experience") AND title:("system design" OR architecture OR hld OR lld)',
+    # '(title:"interview" OR title:"experience") AND title:(oa OR onsite OR final OR phone OR screening)',
+    # '(title:"interview" OR title:"experience") AND title:(oa OR hackerrank OR leetcode OR coding)',
+    # '(title:"interview" OR title:"experience") AND title:("system design" OR architecture OR hld OR lld)',
     # '(title:"interview" OR title:"experience") AND title:(behavioral OR "leadership principles" OR hr OR recruiter)',
     # '(title:"interview" OR title:"experience") AND title:(intern OR internship OR "new grad" OR campus)',
     # '(title:"interview" OR title:"experience") AND title:(phone OR recruiter OR screening OR first OR initial)',
@@ -123,8 +125,10 @@ def score_post(text):
     total_matches = len(flat_matches)  # total number of matches including duplicates
     return score, total_matches
 
-def fetch_and_store_posts(minlength=400, score_threshold=3, time_filter='year'):
+def fetch_and_store_posts(time_filter):
     reddit = get_reddit_instance()
+    logging.info(os.getenv("AZURE_QUEUE_CONN"))
+    queue_client = ensure_queue_exists(os.getenv("AZURE_QUEUE_CONN"), "reddit-posts")
     all_data = []
     for subreddit_name in SUBREDDITS:
         subreddit = reddit.subreddit(subreddit_name)
@@ -161,70 +165,5 @@ def fetch_and_store_posts(minlength=400, score_threshold=3, time_filter='year'):
                     "comments": comments_data
                 }
                 all_data.append(post_data)
-
-    output_path = "reddit_data.json"
-    # Try to load existing array, else start new
-    if os.path.exists(output_path):
-        try:
-            with open(output_path, "r", encoding="utf-8") as f:
-                existing = json.load(f)
-            if not isinstance(existing, list):
-                existing = [existing]
-        except Exception:
-            existing = []
-    else:
-        existing = []
-    # Add new posts
-    existing.extend(all_data)
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(existing, f, ensure_ascii=False, indent=2)
-    deduplicate_reddit_data_file()
-    create_summaries_for_all_posts()
-
-def deduplicate_json_list(json_list, hash_file="hashes.txt"):
-    """
-    Removes duplicate JSON objects from a list based on a hash of their content.
-    Stores seen hashes in a persistent file.
-    Returns a deduplicated list.
-    """
-    # Load existing hashes from file
-    if os.path.exists(hash_file):
-        with open(hash_file, "r", encoding="utf-8") as f:
-            hash_set = set(line.strip() for line in f if line.strip())
-    else:
-        hash_set = set()
-
-    deduped = []
-    new_hashes = set()
-    for obj in json_list:
-        # Use a stable hash of the JSON string (sorted keys for consistency)
-        obj_str = json.dumps(obj, sort_keys=True, ensure_ascii=False)
-        obj_hash = hashlib.sha256(obj_str.encode("utf-8")).hexdigest()
-        if obj_hash not in hash_set and obj_hash not in new_hashes:
-            deduped.append(obj)
-            new_hashes.add(obj_hash)
-        # If hash exists, skip (delete from list)
-
-    # Update persistent hash file
-    with open(hash_file, "a", encoding="utf-8") as f:
-        for h in new_hashes:
-            f.write(h + "\n")
-
-    return deduped
-
-def deduplicate_reddit_data_file(input_file="reddit_data.json", hash_file="hashes.txt"):
-    output_path = "reddit_data.json"
-    if os.path.exists(output_path):
-        with open(output_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        deduped_data = deduplicate_json_list(data)
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(deduped_data, f, ensure_ascii=False, indent=2)
-            
-if __name__ == "__main__":
-    fetch_and_store_posts(time_filter='day')   # fetches today's posts
-    fetch_and_store_posts(time_filter='week')  # fetches this week's posts
-    # fetch_and_store_posts(time_filter='month') # fetches this month's posts
-    # fetch_and_store_posts(time_filter='year')  # fetches this year's posts
-    # fetch_and_store_posts(time_filter='month')  # fetches all posts
-    # create_summaries_for_all_posts()
+                enqueue_post(queue_client, Post, post.url, post_data, hashlib.sha256(json.dumps(post_data, sort_keys=True).encode("utf-8")).hexdigest())
+    create_summaries_for_all_posts(queue_client)
