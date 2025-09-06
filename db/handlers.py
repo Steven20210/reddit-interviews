@@ -41,7 +41,7 @@ class Post(Document):
                 cls(url=input_url, hash=new_hash, payload=payload).save()
                 print(f"Inserted new post: {input_url}")
         except Exception as e:
-            print(f"Caught an exception: {e}")
+            logging.error(f"Caught an exception: {e}")
         return True
 
 class SummarizedPost(Document):
