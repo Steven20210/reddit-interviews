@@ -28,7 +28,6 @@ def enqueue_post(queue_client, model, url, payload, hash):
     # Upsert in MongoDB
     enque = model.upsert_post(url, payload, hash)
     
-    logging.info(f"fasdfasdf{os.getenv("TEST_STEVEN")}")
     # Push a message to Azure Queue
     if enque:
         queue_client.send_message(json.dumps({"url": url, "hash": hash, "payload": payload}))

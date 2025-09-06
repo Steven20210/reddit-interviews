@@ -1,6 +1,8 @@
 LICENSE
 README.md
 setup.py
+aqs/__init__.py
+aqs/queue_handlers.py
 backend/__init__.py
 backend/ai_processing.py
 backend/app.py
