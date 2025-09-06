@@ -12,6 +12,6 @@ def ScrapeRedditJob(myTimer: func.TimerRequest) -> None:
     
     if myTimer.past_due:
         logging.info('The timer is past due!')
-
+    logging.info("Starting Reddit scraping job.")
     fetch_and_store_posts(time_filter='day')  # fetches this day's posts
     logging.info('Python timer trigger function executed.')

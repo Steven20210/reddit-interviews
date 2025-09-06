@@ -92,7 +92,7 @@ CONTENT:
         "max_tokens": 2000,
         "temperature": 0.2
     }
-    logging.info("Sending request to Groq API for interview summary extraction with comments.")
+    logging.info("Sending request to Groq API for interview summary extraction with comments LOLOLOLOL.")
     try:
         response = requests.post(url, headers=headers, data=json.dumps(payload))
         response.raise_for_status()

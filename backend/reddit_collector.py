@@ -127,7 +127,6 @@ def score_post(text):
 
 def fetch_and_store_posts(time_filter):
     reddit = get_reddit_instance()
-    logging.info(os.getenv("AZURE_QUEUE_CONN"))
     queue_client = ensure_queue_exists(os.getenv("AZURE_QUEUE_CONN"), "reddit-posts")
     all_data = []
     for subreddit_name in SUBREDDITS:
@@ -165,6 +164,7 @@ def fetch_and_store_posts(time_filter):
                     "comments": comments_data
                 }
                 all_data.append(post_data)
+                logging.info(f"Fetched post: {post.title} with {len(comments_data)} comments")
                 enqueue_post(queue_client, Post, post.url, post_data, hashlib.sha256(json.dumps(post_data, sort_keys=True).encode("utf-8")).hexdigest())
     create_summaries_for_all_posts(queue_client)
 
