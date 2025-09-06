@@ -6,7 +6,7 @@ from backend.reddit_collector import fetch_and_store_posts
 
 app = func.FunctionApp()
 
-@app.timer_trigger(schedule="0 */5 * * * *", arg_name="myTimer", run_on_startup=True,
+@app.timer_trigger(schedule="0 */1 * * * *", arg_name="myTimer", run_on_startup=True,
               use_monitor=False) 
 def ScrapeRedditJob(myTimer: func.TimerRequest) -> None:
     
