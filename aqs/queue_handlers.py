@@ -4,6 +4,7 @@ import json, os
 from typing import Callable
 from dotenv import load_dotenv
 from azure.core.exceptions import ResourceExistsError
+import logging 
 
 def ensure_queue_exists(conn_str: str, queue_name: str) -> QueueClient:
     """
@@ -25,9 +26,12 @@ def ensure_queue_exists(conn_str: str, queue_name: str) -> QueueClient:
 
 def enqueue_post(queue_client, model, url, payload, hash):
     # Upsert in MongoDB
-    model.upsert_post(url, payload, hash)
+    enque = model.upsert_post(url, payload, hash)
+    
+    logging.info(f"fasdfasdf{os.getenv("TEST_STEVEN")}")
     # Push a message to Azure Queue
-    queue_client.send_message(json.dumps({"url": url, "hash": hash, "payload": payload}))
+    if enque:
+        queue_client.send_message(json.dumps({"url": url, "hash": hash, "payload": payload}))
     
     
 def consume_messages(queue_client, callback: Callable[[Post], None], batch_size: int = 10):
