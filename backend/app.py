@@ -1,24 +1,35 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
+
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
 import logging
-# from reddit_collector import fetch_and_store_posts
-# from ai_processing import create_summaries_for_all_posts
-# import os
-# import json
+import os 
+from collections import defaultdict
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from pymongo import MongoClient
 from pydantic import BaseModel
 from typing import Optional
+from middleware.auth import verify_ephemeral_token, make_ephemeral_token, get_token_from_header
+from dotenv import load_dotenv
+load_dotenv()
+from fastapi import Request
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="InterviewsDB API", version="1.0.0")
-client = MongoClient("mongodb://localhost:27017/")
-db = client["mydb"]
-collection = db["summarized_posts"]
+client = MongoClient(os.getenv("MONGODB_URI"))
+db = client["reddit-interview"]
+summarized_collection = db["summarized_posts"]
+companies_metadata_collection = db["company_metadata"]
+companies_metadata_inverted_collection = db["company_metadata_inverted"]
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Add CORS middleware to allow frontend to communicate with backend
 app.add_middleware(
@@ -35,94 +46,75 @@ class SearchRequest(BaseModel):
     page: int = 1
     limit: int = 10
     
+@limiter.limit("5/minute")    
 @app.get("/")
-async def root():
+async def root(request: Request):
     return {"message": "InterviewsDB API is running"}
 
+@limiter.limit("30/minute")
+@app.get("/token")
+def get_token(request: Request):
+    token = make_ephemeral_token()
+    return {"token": token}
+
+@limiter.limit("30/minute")
 @app.post("/search")
-def search(request: SearchRequest):
+def search(request: Request, search_request: SearchRequest, token: str = Depends(get_token_from_header)):
+    ok, info = verify_ephemeral_token(token)
+    if not ok:
+        raise HTTPException(401, info)
     filter_query = {}
-
+    companies = set()
+    roles = set()
+    company_map = defaultdict(set)
+    role_map = defaultdict(set)
+    
     # Full-text search in raw + summary
-    if request.query:
+    if search_request.query:
         filter_query["$or"] = [
-            {"raw": {"$regex": request.query, "$options": "i"}},
-            {"summary": {"$regex": request.query, "$options": "i"}}
+            {"raw": {"$regex": search_request.query, "$options": "i"}},
+            {"summary": {"$regex": search_request.query, "$options": "i"}}
         ]
-
+        
+    metadata = companies_metadata_collection.find({})
+    for entry in metadata:
+        companies.add(entry["company"])
+        company_map[entry["company"]] = set(entry.get("roles", [])) 
+        for r in entry.get("roles", []):
+            role_map[r].add(entry["company"])
+            roles.add(r)
+            
     # Company filter
-    if request.company and request.company != "all":
-        filter_query["company"] = request.company
-
+    if search_request.company and search_request.company != "all":
+        filter_query["company"] = search_request.company
+        roles = company_map.get(search_request.company, set())
     # Role filter
-    if request.role and request.role != "all":
-        filter_query["role"] = request.role
-
+    if search_request.role and search_request.role != "all":
+        filter_query["role"] = search_request.role
+        companies = role_map.get(search_request.role, set())
+        
     # Count + Pagination
-    total = collection.count_documents(filter_query)
+    total = summarized_collection.count_documents(filter_query)
     results = list(
-        collection.find(filter_query)
-        .skip((request.page - 1) * request.limit)
-        .limit(request.limit)
+        summarized_collection.find(filter_query)
+        .skip((search_request.page - 1) * search_request.limit)
+        .limit(search_request.limit)
     )
 
     # Convert ObjectId to string
     for r in results:
         r["_id"] = str(r["_id"])
+        companies.add(r["company"])
+        roles.add(r["role"])
 
     return {
         "total": total,
-        "page": request.page,
-        "limit": request.limit,
+        "page": search_request.page,
+        "limit": search_request.limit,
         "results": results,
+        "companies": sorted(companies),
+        "roles": sorted(roles)
     }
-
-
-# @app.post("/api/fetch-reddit-posts")
-# async def fetch_reddit_posts():
-#     """
-#     Fetch new Reddit posts and process them into summaries
-#     """
-#     try:
-#         logger.info("Starting Reddit post fetch process...")
-        
-#         # Fetch posts from different time periods
-#         # fetch_and_store_posts(time_filter='week')   # fetches today's posts
-#         fetch_and_store_posts(time_filter='month')  # fetches this week's posts
-#         # fetch_and_store_posts(time_filter='year')
-#         # fetch_and_store_posts(time_filter='day')
-        
-#         logger.info("Reddit posts fetched successfully, now creating summaries...")
-        
-#         # Create summaries for all posts
-#         create_summaries_for_all_posts()
-        
-#         # Get the count of posts and summaries
-#         reddit_data_count = 0
-#         summary_count = 0
-        
-#         if os.path.exists("reddit_data.json"):
-#             with open("reddit_data.json", "r", encoding="utf-8") as f:
-#                 reddit_data = json.load(f)
-#                 reddit_data_count = len(reddit_data) if isinstance(reddit_data, list) else 1
-        
-#         if os.path.exists("filtered_summaries.json"):
-#             with open("filtered_summaries.json", "r", encoding="utf-8") as f:
-#                 summaries = json.load(f)
-#                 summary_count = len(summaries) if isinstance(summaries, list) else 1
-        
-#         logger.info(f"Process completed. Reddit posts: {reddit_data_count}, Summaries: {summary_count}")
-        
-#         return JSONResponse({
-#             "success": True,
-#             "message": "Reddit posts fetched and processed successfully",
-#             "reddit_posts_count": reddit_data_count,
-#             "summaries_count": summary_count
-#         })
-        
-#     except Exception as e:
-#         logger.error(f"Error fetching Reddit posts: {str(e)}")
-#         raise HTTPException(status_code=500, detail=f"Error fetching Reddit posts: {str(e)}")
-
+    
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=8001, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

@@ -84,10 +84,21 @@ export default function InterviewSearchPage() {
   // ---------------------------------------------
   const fetchPosts = async () => {
     try {
+      const tokenResp = await fetch("http://localhost:8001/token", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!tokenResp.ok) {
+        throw new Error(`Token fetch failed: ${tokenResp.status}`);
+      }
+      const { token } = await tokenResp.json();
       const page = currentPage.toString();
       const res = await fetch("http://localhost:8001/search", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           query: searchQuery,
           company: companyFilter,
@@ -106,8 +117,8 @@ export default function InterviewSearchPage() {
         company: item.company ?? "Unknown",
         role: item.role ?? "Unknown",
       }));
-      setCompanies(posts.map((p) => p.company || "Unknown"));
-      setRoles(posts.map((p) => p.role || "Unknown"));
+      setCompanies(data.companies || []);
+      setRoles(data.roles || []);
 
       const total = data.total ?? posts.length;
       const limit = data.limit ?? 10;
@@ -137,43 +148,8 @@ export default function InterviewSearchPage() {
   // Immediate fetch on filter/page change
   useEffect(() => {
     fetchPosts();
+    setCurrentPage(1); // reset page on new search
   }, [companyFilter, roleFilter, currentPage]);
-
-  // ---------------------------------------------
-  // Fetch new Reddit posts (admin/dev only)
-  // ---------------------------------------------
-  const fetchNewPosts = async () => {
-    setIsFetching(true);
-    setFetchStatus("Fetching new Reddit posts...");
-
-    try {
-      const response = await fetch(
-        "http://localhost:8000/api/fetch-reddit-posts",
-        { method: "POST", headers: { "Content-Type": "application/json" } }
-      );
-
-      if (!response.ok)
-        throw new Error(`HTTP error! status: ${response.status}`);
-
-      const result = await response.json();
-      setFetchStatus(
-        `Success! Fetched ${result.reddit_posts_count} posts and created ${result.summaries_count} summaries.`
-      );
-
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
-    } catch (error) {
-      console.error("Error fetching posts:", error);
-      setFetchStatus(
-        `Error: ${
-          error instanceof Error ? error.message : "Failed to fetch posts"
-        }`
-      );
-    } finally {
-      setIsFetching(false);
-    }
-  };
 
   // ---------------------------------------------
   // UI
@@ -307,22 +283,6 @@ export default function InterviewSearchPage() {
                 >
                   Clear Filters
                 </Button>
-
-                {process.env.NODE_ENV !== "production" && (
-                  <Button
-                    variant="default"
-                    onClick={fetchNewPosts}
-                    disabled={isFetching}
-                    className="h-10"
-                  >
-                    <RefreshCw
-                      className={`h-4 w-4 mr-2 ${
-                        isFetching ? "animate-spin" : ""
-                      }`}
-                    />
-                    {isFetching ? "Fetching..." : "Fetch New Posts"}
-                  </Button>
-                )}
               </div>
             </div>
           </CardContent>

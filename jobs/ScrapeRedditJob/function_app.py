@@ -2,15 +2,6 @@ import azure.functions as func
 import datetime
 import json
 import logging
-
-import sys
-import os
-repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-if os.path.isdir(repo_root):
-    sys.path.insert(0, repo_root)
-else:
-    print(f"Directory does not exist: {repo_root}")
-
 from backend.reddit_collector import fetch_and_store_posts
 
 app = func.FunctionApp()

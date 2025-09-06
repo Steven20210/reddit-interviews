@@ -1,9 +1,12 @@
-from mongoengine import connect, Document, StringField, DictField, BooleanField
+from mongoengine import connect, Document, StringField, DictField, BooleanField, ListField, get_connection
 from mongoengine.errors import NotUniqueError
-from typing import Type, Union
+from typing import List
 import logging 
+import os
+from dotenv import load_dotenv
+load_dotenv()
 # Connect to local MongoDB
-connect(db="mydb", host="localhost", port=27017)
+connect(host=os.getenv("MONGODB_URI"), db="reddit-interview")
 
 class Post(Document):
     url = StringField(required=True, unique=True)
@@ -16,7 +19,6 @@ class Post(Document):
         ],
         'allow_inheritance': True
     }
-
     processed = BooleanField(default=False)
 
     @classmethod
@@ -77,3 +79,26 @@ class SummarizedPost(Document):
             cls(url=url, hash=new_hash, summary=summary, raw_post=raw_post, role=role, company=company).save()
             print(f"Inserted new summarized post: {url}")
     
+class CompanyMetadata(Document):
+    company = StringField(required=True, unique=True)
+    roles = ListField(StringField(), default=list)
+
+    meta = {
+        'collection': 'company_metadata',
+        'indexes': [
+            {'fields': ['company'], 'unique': True}
+        ]
+    }
+
+    @classmethod
+    def upsert_metadata(cls, company: str, role: str) -> None:
+        existing = cls.objects(company=company).first()
+        if existing:
+            if role not in existing.roles:
+                existing.roles.append(role)
+            existing.save()
+            print(f"Updated metadata for company: {company}")
+        else:
+            logging.info(f"Upserting metadata for company: {company}")
+            cls(company=company, roles=[role]).save()
+            print(f"Inserted new metadata for company: {company}")

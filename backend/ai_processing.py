@@ -5,7 +5,7 @@ import json
 import logging
 import time
 from azure.storage.queue import QueueClient
-from db.handlers import SummarizedPost
+from db.handlers import SummarizedPost, CompanyMetadata
 import hashlib
 import re
 from typing import Tuple
@@ -131,6 +131,7 @@ def summarize_post_with_comments(post_data: dict):
         "comments": post_data.get("comments", [])
     }
     company, role = extract_company_and_role(summary)    
+    CompanyMetadata.upsert_metadata(company, role)
     SummarizedPost.upsert_post(entry["url"], summary, raw_post, hashlib.sha256(json.dumps(entry, sort_keys=True).encode("utf-8")).hexdigest(), role, company)
 
 def create_summaries_for_all_posts(queue_client: QueueClient):
@@ -183,8 +184,9 @@ def migrate_old_data():
     
     for post_data in reddit_data:
         company, role = extract_company_and_role(post_data["summary"])
-        print(company, role)    
         SummarizedPost.upsert_post(post_data["url"], post_data["summary"], post_data["raw"], hashlib.sha256(json.dumps(post_data, sort_keys=True).encode("utf-8")).hexdigest(), role, company)
-    
+        CompanyMetadata.upsert_metadata(company, role)
+
+        
 if __name__ == "__main__":
     migrate_old_data()

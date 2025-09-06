@@ -1,0 +1,17 @@
+LICENSE
+README.md
+setup.py
+backend/__init__.py
+backend/ai_processing.py
+backend/app.py
+backend/reddit_collector.py
+backend/run_server.py
+backend/test.py
+db/__init__.py
+db/handlers.py
+middleware/__init__.py
+middleware/auth.py
+myrepo.egg-info/PKG-INFO
+myrepo.egg-info/SOURCES.txt
+myrepo.egg-info/dependency_links.txt
+myrepo.egg-info/top_level.txt
