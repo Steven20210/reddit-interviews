@@ -25,20 +25,23 @@ class Post(Document):
     def upsert_post(cls, input_url: str, payload: dict, new_hash: str) -> bool:
         logging.info(f"Upserting post with URL: {input_url} and hash: {new_hash}")
 
-        existing = cls.objects(url=input_url).first()
-        # logging.info(existing)
-        if existing:
-            if existing.hash != new_hash:
-                existing.hash = new_hash
-                existing.payload = payload
-                existing.save()
-                print(f"Replaced existing post with new hash: {input_url}")
+        try:
+            existing = cls.objects(url=input_url).first()
+            logging.info("ere")
+            if existing:
+                if existing.hash != new_hash:
+                    existing.hash = new_hash
+                    existing.payload = payload
+                    existing.save()
+                    print(f"Replaced existing post with new hash: {input_url}")
+                else:
+                    print(f"Post already exists with same hash: {input_url}")
+                    return False
             else:
-                print(f"Post already exists with same hash: {input_url}")
-                return False
-        else:
-            cls(url=input_url, hash=new_hash, payload=payload).save()
-            print(f"Inserted new post: {input_url}")
+                cls(url=input_url, hash=new_hash, payload=payload).save()
+                print(f"Inserted new post: {input_url}")
+        except Exception as e:
+            print(f"Caught an exception: {e}")
         return True
 
 class SummarizedPost(Document):
