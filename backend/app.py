@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="InterviewsDB API", version="1.0.0")
-client = MongoClient(os.getenv("MONGODBATLAS_CLUSTER_CONNECTIONSTRING"), tls=True)
+client = MongoClient(os.getenv("COSMODB_CONNSTR"), tls=True)
 db = client["reddit-interview"]
 summarized_collection = db["summarized_posts"]
 companies_metadata_collection = db["company_metadata"]
