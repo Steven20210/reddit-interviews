@@ -3,7 +3,7 @@ import datetime
 import json
 import logging
 from backend.reddit_collector import fetch_and_store_posts
-
+import requests
 app = func.FunctionApp()
 
 @app.timer_trigger(schedule="0 */1 * * * *", arg_name="myTimer", run_on_startup=True,
@@ -12,6 +12,8 @@ def ScrapeRedditJob(myTimer: func.TimerRequest) -> None:
     
     if myTimer.past_due:
         logging.info('The timer is past due!')
+    ip = requests.get("https://ifconfig.me").text.strip()
+    logging.info(f"Current IP address: {ip}")
     logging.info("Starting Reddit scraping job. right now")
     fetch_and_store_posts(time_filter='day')  # fetches this day's posts
     logging.info('Python timer trigger function executed.')
