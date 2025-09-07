@@ -129,7 +129,6 @@ def fetch_and_store_posts(time_filter):
     reddit = get_reddit_instance()
     queue_client = ensure_queue_exists(os.getenv("AZURE_QUEUE_CONN"), "reddit-posts")
     all_data = []
-    Post.upsert_post("test", {"test": "data"}, "testhash")  # Test DB connection
     for subreddit_name in SUBREDDITS:
         subreddit = reddit.subreddit(subreddit_name)
         for query in QUERIES:
