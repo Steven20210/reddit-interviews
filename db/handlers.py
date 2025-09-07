@@ -6,7 +6,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 # Connect to local MongoDB
-connect(host=os.getenv("COSMODB_CONNSTR"), db="reddit-interview", tls=True)
+connect(host=os.getenv("MONGODBATLAS_CLUSTER_CONNECTIONSTRING"), db="reddit-interview", tls=True)
 
 class Post(Document):
     url = StringField(required=True, unique=True)
