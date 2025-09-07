@@ -90,10 +90,10 @@ COMPANIES = [
 
 QUERIES = [
     # Company-specific interview experience queries
-    # "palantir"
+    "amazon"
     # *[f'"{company} interview" experience' for company in COMPANIES],
     # # General interview experience queries (keeping some original ones)
-    '(title:"interview" OR title:"experience") AND title:(oa OR onsite OR final OR phone OR screening)',
+    # '(title:"interview" OR title:"experience") AND title:(oa OR onsite OR final OR phone OR screening)',
     # '(title:"interview" OR title:"experience") AND title:(oa OR hackerrank OR leetcode OR coding)',
     # '(title:"interview" OR title:"experience") AND title:("system design" OR architecture OR hld OR lld)',
     # '(title:"interview" OR title:"experience") AND title:(behavioral OR "leadership principles" OR hr OR recruiter)',
