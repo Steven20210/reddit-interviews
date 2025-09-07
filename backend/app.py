@@ -1,5 +1,4 @@
 from fastapi import FastAPI, HTTPException, Depends
-
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -14,8 +13,12 @@ from pydantic import BaseModel
 from typing import Optional
 from middleware.auth import verify_ephemeral_token, make_ephemeral_token, get_token_from_header
 from dotenv import load_dotenv
-load_dotenv()
 from fastapi import Request
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -34,7 +37,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Add CORS middleware to allow frontend to communicate with backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3001", "http://127.0.0.1:3001"],  # Frontend URLs
+    allow_origins=[os.getenv("REDDIT_INTERVIEWS_FRONTEND_URL"), "http://localhost:3001"],  # Frontend URLs
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
