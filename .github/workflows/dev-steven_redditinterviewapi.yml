@@ -22,16 +22,12 @@ jobs:
       - name: Set up Python version
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: "3.9"
 
-      - name: Create and start virtual environment
-        run: |
-          python -m venv venv
-          source venv/bin/activate
-      
       - name: Install dependencies
-        run: pip install -r requirements.txt
-        
+        run: |
+          pip install --target="./.python_packages/lib/site-packages" -r requirements.txt
+
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
 
       - name: Upload artifact for deployment jobs
@@ -40,7 +36,6 @@ jobs:
           name: python-app
           path: |
             .
-            !venv/
 
   deploy:
     runs-on: ubuntu-latest
@@ -54,7 +49,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: python-app
-      
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -62,10 +57,9 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_961C98DBCF41487B9373A0C6642D480F }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_F3856E1872B44933ACD0F22BDC6A4588 }}
 
-      - name: 'Deploy to Azure Web App'
+      - name: "Deploy to Azure Web App"
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
-          app-name: 'redditinterviewapi'
-          slot-name: 'Production'
-          
+          app-name: "redditinterviewapi"
+          slot-name: "Production"
