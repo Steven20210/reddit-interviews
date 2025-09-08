@@ -29,6 +29,10 @@ jobs:
           pip install --target="./.python_packages/lib/site-packages" -r requirements.txt
 
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
+      - name: Verify installed packages
+        run: |
+          echo "Listing first 50 installed packages..."
+          ls -R .python_packages/lib/site-packages | head -50
 
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
@@ -36,6 +40,7 @@ jobs:
           name: python-app
           path: |
             .
+            .python_packages/
 
   deploy:
     runs-on: ubuntu-latest
