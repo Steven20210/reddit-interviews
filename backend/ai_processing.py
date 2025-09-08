@@ -190,22 +190,3 @@ def migrate_old_data():
         CompanyMetadata.upsert_metadata(company, role)
 
         
-if __name__ == "__main__":
-    client = pymongo.MongoClient(os.getenv("COSMODB_CONNSTR"), tls=True)
-    register_connection(alias="default", name="reddit-interview", host=None, mongo_client=client)
-    conn = get_connection(alias="default")   # get the PyMongo client
-    print("Connection object:", conn)
-    db = client["reddit-interview"]
-    print(db.list_collection_names())  # should not throw HMAC errors
-    register_connection(
-    alias="default",
-    name="reddit-interview",
-    host=None,
-    mongo_client=client
-)
-    
-    conn = get_connection(alias="default")
-    print("Connected:", conn)
-    Post.upsert_post("test.com", {"test": "data"}, hashlib.sha256(json.dumps("asdfasdfasdf", sort_keys=True).encode("utf-8")).hexdigest())  # Test DB connection
-    # for prop, value in vars(client.options).items():
-    #     print("Property: {}: Value: {} ".format(prop, value))
