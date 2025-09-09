@@ -37,7 +37,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Add CORS middleware to allow frontend to communicate with backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("REDDIT_INTERVIEWS_FRONTEND_URL"), "http://localhost:3001"],  # Frontend URLs
+    allow_origins=[os.getenv("REDDIT_INTERVIEWS_FRONTEND_URL"), "http://localhost:3000"],  # Frontend URLs
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

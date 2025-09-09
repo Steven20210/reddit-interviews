@@ -84,29 +84,35 @@ export default function InterviewSearchPage() {
   // ---------------------------------------------
   const fetchPosts = async () => {
     try {
-      const tokenResp = await fetch("http://localhost:8001/token", {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
+      const tokenResp = await fetch(
+        process.env.NEXT_PUBLIC_BACKEND_API_ENDPOINT! + "/token",
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
       if (!tokenResp.ok) {
         throw new Error(`Token fetch failed: ${tokenResp.status}`);
       }
       const { token } = await tokenResp.json();
       const page = currentPage.toString();
-      const res = await fetch("http://localhost:8001/search", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          query: searchQuery,
-          company: companyFilter,
-          role: roleFilter,
-          page: page,
-          limit: 10,
-        }),
-      });
+      const res = await fetch(
+        process.env.NEXT_PUBLIC_BACKEND_API_ENDPOINT! + "/search",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            query: searchQuery,
+            company: companyFilter,
+            role: roleFilter,
+            page: page,
+            limit: 10,
+          }),
+        }
+      );
       if (!res.ok) throw new Error(`Error: ${res.status}`);
       const data = await res.json();
       // 🔑 Parse raw backend results into what the frontend expects
@@ -122,9 +128,6 @@ export default function InterviewSearchPage() {
 
       const total = data.total ?? posts.length;
       const limit = data.limit ?? 10;
-
-      console.log("Fetched posts:", { posts, companies, roles, total, limit });
-
       setPosts(posts);
       setTotalPages(Math.min(10, Math.ceil(total / limit)));
     } catch (err) {
