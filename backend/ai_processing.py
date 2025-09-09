@@ -4,7 +4,13 @@ from dotenv import load_dotenv
 import json
 import logging
 import time
-
+from azure.storage.queue import QueueClient
+from db.handlers import SummarizedPost, CompanyMetadata, Post
+from mongoengine import get_connection, connect, register_connection
+import hashlib
+import pymongo
+import re
+from typing import Tuple
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -18,6 +24,25 @@ GROQ_API_KEY = os.getenv("GROQ_TOKEN")
 RAW_REDDIT_DATA_FILE = "reddit_data.json"
 if not GROQ_API_KEY:
     logging.error("GROQ_TOKEN not found in environment variables.")
+
+role_patterns = [
+    {"regex": re.compile(r"sde[\s\-]?i\b|sde[\s\-]?1\b|sdei\b|sde1\b|software engineer[\s\-]?i\b|software engineer[\s\-]?1\b", re.I), "norm": "SDE I"},
+    {"regex": re.compile(r"sde[\s\-]?ii\b|sde[\s\-]?2\b|sdeii\b|sde2\b|software engineer[\s\-]?ii\b|software engineer[\s\-]?2\b", re.I), "norm": "SDE II"},
+    {"regex": re.compile(r"sde[\s\-]?iii\b|sde[\s\-]?3\b|sdeiii\b|sde3\b|software engineer[\s\-]?iii\b|software engineer[\s\-]?3\b", re.I), "norm": "SDE III"},
+    {"regex": re.compile(r"sde[\s\-]?intern|software engineer intern", re.I), "norm": "SDE Intern"},
+    {"regex": re.compile(r"swe[\s\-]?intern", re.I), "norm": "SWE Intern"},
+    {"regex": re.compile(r"software engineer", re.I), "norm": "Software Engineer"},
+    {"regex": re.compile(r"software developer", re.I), "norm": "Software Developer"},
+    {"regex": re.compile(r"backend engineer", re.I), "norm": "Backend Engineer"},
+    {"regex": re.compile(r"frontend engineer", re.I), "norm": "Frontend Engineer"},
+    {"regex": re.compile(r"full[\s\-]?stack engineer", re.I), "norm": "Full Stack Engineer"},
+    {"regex": re.compile(r"data scientist", re.I), "norm": "Data Scientist"},
+    {"regex": re.compile(r"data engineer", re.I), "norm": "Data Engineer"},
+    {"regex": re.compile(r"product manager", re.I), "norm": "Product Manager"},
+    {"regex": re.compile(r"engineering manager", re.I), "norm": "Engineering Manager"},
+    {"regex": re.compile(r"new grad", re.I), "norm": "New Grad"},
+    {"regex": re.compile(r"intern", re.I), "norm": "Intern"},
+]
 
 def extract_interview_summary_with_comments(post_data):
     """
@@ -69,45 +94,7 @@ CONTENT:
         "max_tokens": 2000,
         "temperature": 0.2
     }
-    logging.info("Sending request to Groq API for interview summary extraction with comments.")
-    try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
-        response.raise_for_status()
-        logging.info("Received response from Groq API.")
-        return response.json()["choices"][0]["message"]["content"]
-    except requests.RequestException as e:
-        logging.error(f"Groq API request failed: {e}")
-        return None
-
-def extract_interview_summary(text):
-    prompt = f"""
-    
-You are an information extractor. 
-Extract details about interview experiences only if the text explicitly describes the interview experience of the poster themselves.
-
-If the text is only asking for advice, speculation, or does not describe the interview experience directly, 
-respond with exactly:
-
-None
-
-Do not wrap "None" in JSON or code blocks.
-ELSE Summarize the interview experience in concise bullet points.
-MAKE sure to include the company name and role if mentioned.
-Text:
-{text}
-"""
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": "gemma2-9b-it",
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 2000,
-        "temperature": 0.2
-    }
-    logging.info("Sending request to Groq API for interview summary extraction.")
+    logging.info("Sending request to Groq API for interview summary extraction with comments this test LIT.")
     try:
         response = requests.post(url, headers=headers, data=json.dumps(payload))
         response.raise_for_status()
@@ -130,12 +117,13 @@ def summarize_post_with_comments(post_data: dict):
     # Use the new comment-aware extraction function
     summary = extract_interview_summary_with_comments(post_data)
     
-    if summary == "None":
+    if summary not in [None, "None", "None \n"]:
         logging.warning("No summary returned for post.")
     
     # Create entry with all relevant post data
+    raw_post = post_data.get("title", "") + "\n\n" + post_data.get("selftext", "")
     entry = {
-        "raw": post_data.get("title", "") + "\n\n" + post_data.get("selftext", ""),
+        "raw":  raw_post,
         "summary": summary,
         "url": post_data.get("url", ""),
         "post_id": post_data.get("post_id", ""),
@@ -144,114 +132,61 @@ def summarize_post_with_comments(post_data: dict):
         "num_comments": post_data.get("num_comments", 0),
         "comments": post_data.get("comments", [])
     }
+    company, role = extract_company_and_role(summary)    
+    CompanyMetadata.upsert_metadata(company, role)
+    SummarizedPost.upsert_post(entry["url"], summary, raw_post, hashlib.sha256(json.dumps(entry, sort_keys=True).encode("utf-8")).hexdigest(), role, company)
+
+def create_summaries_for_all_posts(queue_client: QueueClient):
+    logging.info(f"Dequeuing Reddit Posts.")
+    posts = queue_client.receive_messages()
+    posts = list(posts)
+    for post in posts:
+        post_data = json.loads(post.content)
+        # logging.info('erer', post_data)
+        logging.info(f"Processing post: {post}")
+        # Use the new comment-aware summarization function
+        summarize_post_with_comments(post_data["payload"])
+        time.sleep(4)  # Sleep to avoid hitting API rate limits
+        queue_client.delete_message(post)
+
+def extract_company_and_role(text: str) -> Tuple[str, str]:
+    # Remove bullets, asterisks, and excessive whitespace
+    clean_text = re.sub(r"[*•]", "", text)
+    clean_text = clean_text.strip()
+
+    # Extract company
+    company_match = re.search(r"Company:\s*(.+)", clean_text, re.I)
+    company = company_match.group(1).strip() if company_match else "Unknown"
+
+    # Extract raw role text
+    role_match = re.search(r"Role:\s*(.+)", clean_text, re.I)
+    role_raw = role_match.group(1).strip() if role_match else ""
+
+    # Normalize role using role_patterns
+    normalized_role = "Unknown"
+    if role_raw:
+        for pattern in role_patterns:
+            if pattern["regex"].search(role_raw):
+                normalized_role = pattern["norm"]
+                break
+
+    return company, normalized_role
+
+
+def migrate_old_data():
+    if not os.path.exists("backend/filtered_summaries copy.json"):
+        print("No filtered_summaries copy file found for migration.")
+        return
     
-    # Write to summary_output.json as a JSON array
-    output_path = "summary_output.json"
-    try:
-        if os.path.exists(output_path):
-            with open(output_path, "r", encoding="utf-8") as f:
-                try:
-                    data = json.load(f)
-                    if isinstance(data, list):
-                        data.append(entry)
-                    else:
-                        data = [data, entry]
-                except json.JSONDecodeError:
-                    # File exists but is not valid JSON, start new array
-                    data = [entry]
-        else:
-            data = [entry]
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        logging.info("Summary written to summary_output.json as array.")
-    except Exception as e:
-        logging.error(f"Failed to write summary to file: {e}")
-    logging.info("Summary written to summary_output.json.")
+    with open("backend/filtered_summaries copy.json", "r", encoding="utf-8") as f:
+        reddit_data = json.load(f)
+    
+    if not isinstance(reddit_data, list):
+        reddit_data = [reddit_data]
+    
+    for post_data in reddit_data:
+        company, role = extract_company_and_role(post_data["summary"])
+        SummarizedPost.upsert_post(post_data["url"], post_data["summary"], post_data["raw"], hashlib.sha256(json.dumps(post_data, sort_keys=True).encode("utf-8")).hexdigest(), role, company)
+        CompanyMetadata.upsert_metadata(company, role)
 
-def summarize_post(raw_doc: str, url: str):
-    logging.info("Summarizing a Reddit post.")
-    summary = extract_interview_summary(raw_doc)
-    if summary == "None":
-        logging.warning("No summary returned for post.")
-    # Write to summary_output.json as a JSON array if the file contains an array, else create a new array
-    output_path = "summary_output.json"
-    entry = {"raw": raw_doc, "summary": summary, "url": url}
-    try:
-        if os.path.exists(output_path):
-            with open(output_path, "r", encoding="utf-8") as f:
-                try:
-                    data = json.load(f)
-                    if isinstance(data, list):
-                        data.append(entry)
-                    else:
-                        data = [data, entry]
-                except json.JSONDecodeError:
-                    # File exists but is not valid JSON, start new array
-                    data = [entry]
-        else:
-            data = [entry]
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        logging.info("Summary written to summary_output.json as array.")
-    except Exception as e:
-        logging.error(f"Failed to write summary to file: {e}")
-    logging.info("Summary written to summary_output.json.")
-
-def create_summaries_for_all_posts():
-    logging.info(f"Loading Reddit posts from {RAW_REDDIT_DATA_FILE}.")
-    try:
-        with open(RAW_REDDIT_DATA_FILE, "r", encoding="utf-8") as f:
-            posts = json.load(f)
-            logging.info(f"Loaded {len(posts)} posts from file.")
-        i = 0
-        input_size = len(posts)
-        while i < input_size:
-            post_data = posts[i]
-            # Use the new comment-aware summarization function
-            summarize_post_with_comments(post_data)
-            logging.info(f"Deleted processed post at index {i}.")
-            i += 1
-            time.sleep(4)  # Sleep to avoid hitting API rate limits
-            # Write the updated posts list back to the source file after each deletion
-        posts = []
-        try:
-            with open(RAW_REDDIT_DATA_FILE, "w", encoding="utf-8") as f:
-                json.dump(posts, f, ensure_ascii=False, indent=2)
-            logging.info(f"Updated {RAW_REDDIT_DATA_FILE} after deletion.")
-        except Exception as e:
-            logging.error(f"Failed to update {RAW_REDDIT_DATA_FILE}: {e}")
-    except Exception as e:
-        logging.error(f"Failed to process posts: {e}")
-    filter_summaries()
         
-def filter_summaries(input_file="summary_output.json", output_file="filtered_summaries.json"):
-    """
-    Filters out entries where summary is "None" or null and writes the rest to a new JSON file.
-    """
-    try:
-        with open(input_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        filtered = [entry for entry in data if entry.get("summary") not in [None, "None", "None \n"]]
-        # Write to interview-search frontend directory
-        frontend_output_path = os.path.join("..", "frontend", "public", "filtered_summaries.json")
-        try:
-            if os.path.exists(frontend_output_path):
-                with open(frontend_output_path, "r", encoding="utf-8") as f:
-                    try:
-                        data = json.load(f)
-                        if isinstance(data, list):
-                            data.extend(filtered)
-
-                    except json.JSONDecodeError:
-                        # File exists but is not valid JSON, start new array
-                        data = filtered
-            else:
-                data = filtered
-            with open(frontend_output_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            logging.info("Summary written to summary_output.json as array.")
-        except Exception as e:
-            logging.error(f"Failed to write summary to file: {e}")
-        logging.info(f"Filtered summaries written to {output_file}.")
-    except Exception as e:
-        logging.error(f"Failed to filter summaries: {e}")
