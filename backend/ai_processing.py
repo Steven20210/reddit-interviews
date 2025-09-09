@@ -117,7 +117,7 @@ def summarize_post_with_comments(post_data: dict):
     # Use the new comment-aware extraction function
     summary = extract_interview_summary_with_comments(post_data)
     
-    if summary == "None":
+    if summary not in [None, "None", "None \n"]:
         logging.warning("No summary returned for post.")
     
     # Create entry with all relevant post data
