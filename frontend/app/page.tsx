@@ -290,6 +290,7 @@ export default function InterviewSearchPage() {
             </div>
           </CardContent>
         </Card>
+        <Analytics />
 
         {/* Fetch Status */}
         {fetchStatus && (
