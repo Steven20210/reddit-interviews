@@ -120,4 +120,5 @@ def search(request: Request, search_request: SearchRequest, token: str = Depends
     }
     
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    port = int(os.environ.get("PORT", 8000))  # fallback to 8000 locally
+    uvicorn.run(app, host="0.0.0.0", port=port)
