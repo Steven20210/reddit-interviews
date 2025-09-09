@@ -20,7 +20,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { set } from "date-fns";
-
+import { Check, ChevronsUpDown } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 // ---------------------------------------------
 // Types
 // ---------------------------------------------
@@ -62,6 +75,75 @@ export function BoldText({ text }: { text: string }) {
   );
 }
 
+type SearchableSelectProps = {
+  label: string;
+  items: string[];
+  value: string;
+  onChange: (val: string) => void;
+  icon?: React.ReactNode;
+};
+
+export function SearchableSelect({
+  label,
+  items,
+  value,
+  onChange,
+  icon,
+}: SearchableSelectProps) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="flex-1">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button className="inline-flex items-center justify-between rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-auto max-w-xs whitespace-normal break-words">
+            {icon}
+            <span className="ml-2 text-left">
+              {value === "all" ? `All ${label}s` : value}
+            </span>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[200px] p-0">
+          <Command>
+            <CommandInput placeholder={`Search ${label.toLowerCase()}...`} />
+            <CommandList>
+              <CommandEmpty>No {label.toLowerCase()} found.</CommandEmpty>
+              <CommandGroup>
+                <CommandItem
+                  key="all"
+                  onSelect={() => {
+                    onChange("all");
+                    setOpen(false);
+                  }}
+                >
+                  All {label}s
+                  {value === "all" ? (
+                    <Check className="ml-auto h-4 w-4" />
+                  ) : null}
+                </CommandItem>
+                {items.map((item) => (
+                  <CommandItem
+                    key={item}
+                    onSelect={() => {
+                      onChange(item);
+                      setOpen(false);
+                    }}
+                  >
+                    {item}
+                    {item === value ? (
+                      <Check className="ml-auto h-4 w-4" />
+                    ) : null}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
 // ---------------------------------------------
 // Component
 // ---------------------------------------------
@@ -76,7 +158,6 @@ export default function InterviewSearchPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const [isFetching, setIsFetching] = useState(false);
-  const [fetchStatus, setFetchStatus] = useState<string>("");
   const [message, setMessage] = useState("Loading...");
 
   // ---------------------------------------------
@@ -148,11 +229,15 @@ export default function InterviewSearchPage() {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
+  // fetch new page on page change
+  useEffect(() => {
+    fetchPosts();
+  }, [currentPage]);
   // Immediate fetch on filter/page change
   useEffect(() => {
     fetchPosts();
     setCurrentPage(1); // reset page on new search
-  }, [companyFilter, roleFilter, currentPage]);
+  }, [companyFilter, roleFilter]);
 
   // ---------------------------------------------
   // UI
@@ -240,40 +325,23 @@ export default function InterviewSearchPage() {
                 {/* Filters */}
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="flex-1">
-                    <Select
+                    <SearchableSelect
+                      label="Companie"
+                      items={companies ?? []}
                       value={companyFilter}
-                      onValueChange={setCompanyFilter}
-                    >
-                      <SelectTrigger className="h-10">
-                        <Building2 className="h-4 w-4 mr-2" />
-                        <SelectValue placeholder="Filter by company" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Companies</SelectItem>
-                        {(companies ?? []).map((company) => (
-                          <SelectItem key={company} value={company}>
-                            {company}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={setCompanyFilter}
+                      icon={<Building2 className="h-4 w-4" />}
+                    />
                   </div>
 
                   <div className="flex-1">
-                    <Select value={roleFilter} onValueChange={setRoleFilter}>
-                      <SelectTrigger className="h-10">
-                        <Briefcase className="h-4 w-4 mr-2" />
-                        <SelectValue placeholder="Filter by role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Roles</SelectItem>
-                        {(roles ?? []).map((role) => (
-                          <SelectItem key={role} value={role}>
-                            {role}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      label="Role"
+                      items={roles ?? []}
+                      value={roleFilter}
+                      onChange={setRoleFilter}
+                      icon={<Briefcase className="h-4 w-4" />}
+                    />
                   </div>
 
                   <Button
@@ -292,23 +360,6 @@ export default function InterviewSearchPage() {
             </CardContent>
           </Card>
 
-          {/* Fetch Status */}
-          {fetchStatus && (
-            <Card className="mb-4">
-              <CardContent className="p-4">
-                <p
-                  className={`text-sm ${
-                    fetchStatus.includes("Error")
-                      ? "text-red-600"
-                      : "text-green-600"
-                  }`}
-                >
-                  {fetchStatus}
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
           {/* Results Count */}
           <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <p className="text-muted-foreground">
@@ -316,21 +367,49 @@ export default function InterviewSearchPage() {
               {totalPages})
             </p>
             {totalPages > 1 && (
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">Page:</span>
-                <select
-                  value={currentPage}
-                  onChange={(e) => setCurrentPage(Number(e.target.value))}
-                  className="border rounded px-2 py-1"
+              <div className="flex items-center space-x-2">
+                {/* Prev button */}
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded border bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 dark:bg-orange-950/20 dark:border-orange-800 dark:text-orange-300 disabled:opacity-50"
                 >
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                    (pageNum) => (
-                      <option key={pageNum} value={pageNum}>
-                        {pageNum}
-                      </option>
-                    )
-                  )}
-                </select>
+                  Prev
+                </button>
+
+                {/* Page number sliding window */}
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((pageNum) => {
+                    // Sliding window of 3 pages around currentPage
+                    return (
+                      pageNum >= Math.max(1, currentPage - 1) &&
+                      pageNum <= Math.min(totalPages, currentPage + 1)
+                    );
+                  })
+                  .map((pageNum) => (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`px-3 py-1 rounded border ${
+                        currentPage === pageNum
+                          ? "bg-orange-500 text-white border-orange-600 dark:bg-orange-600 dark:border-orange-700"
+                          : "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 dark:bg-orange-950/20 dark:border-orange-800 dark:text-orange-300"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+
+                {/* Next button */}
+                <button
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 rounded border bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 dark:bg-orange-950/20 dark:border-orange-800 dark:text-orange-300 disabled:opacity-50"
+                >
+                  Next
+                </button>
               </div>
             )}
           </div>
