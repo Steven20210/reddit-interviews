@@ -29,7 +29,6 @@ client = MongoClient(os.getenv("COSMODB_CONNSTR"), tls=True)
 db = client["reddit-interview"]
 summarized_collection = db["summarized_posts"]
 companies_metadata_collection = db["company_metadata"]
-companies_metadata_inverted_collection = db["company_metadata_inverted"]
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

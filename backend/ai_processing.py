@@ -16,6 +16,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[logging.StreamHandler()]
 )
+from pymongo import MongoClient
 
 load_dotenv()
 logging.info("Loaded environment variables from .env")
@@ -70,15 +71,18 @@ def extract_interview_summary_with_comments(post_data):
     
     prompt = f"""Extract interview experience info from Reddit posts/comments.
 
-RULES:
-- Post has detailed experience → summarize it
-- Post is question + comments have experience → summarize both
-- Post is question + no useful comments → return "None"
-- Include company/role if mentioned
-- Focus on rounds, questions, difficulty, tips
-- Ignore generic advice
+Rules:
+- If post has detailed experience → summarize it
+- If post is a question → include useful experience from comments
+- If no useful info → return "None"
+- Always include Company and Role (use "Unknown Company"/"Unknown role" if missing)
+- Focus on rounds, example questions, difficulty, tips
+- Ignore generic/non-specific advice
 
-FORMAT: Bullet points if valuable info, "None" if not.
+Format:
+Company: <...>
+Role: <...>
+Summary:
 
 CONTENT:
 {full_content}"""
@@ -155,13 +159,11 @@ def extract_company_and_role(text: str) -> Tuple[str, str]:
     clean_text = clean_text.strip()
 
     # Extract company
-    company_match = re.search(r"Company:\s*(.+)", clean_text, re.I)
+    company_match = re.search(r"Company:\s*([^\n\r]+)", clean_text, re.I)
+    role_match = re.search(r"Role:\s*([^\n\r]+)", clean_text, re.I)
+
     company = company_match.group(1).strip() if company_match else "Unknown"
-
-    # Extract raw role text
-    role_match = re.search(r"Role:\s*(.+)", clean_text, re.I)
-    role_raw = role_match.group(1).strip() if role_match else ""
-
+    role_raw = role_match.group(1).strip() if role_match else "Unknown"
     # Normalize role using role_patterns
     normalized_role = "Unknown"
     if role_raw:
