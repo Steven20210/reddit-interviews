@@ -300,7 +300,9 @@ export default function InterviewSearchPage() {
                     terms of service and API usage guidelines. The information
                     provided may not be accurate, complete, or up-to-date.
                     Always verify information from official sources and consult
-                    with professionals for career advice.
+                    with professionals for career advice. This content is
+                    scraped from Reddit. All interview experiences and posts
+                    belong to their respective Reddit users and are not my own.
                   </p>
                 </div>
               </div>
@@ -508,16 +510,6 @@ export default function InterviewSearchPage() {
               })
             )}
           </div>
-        </div>
-
-        {/* Footer Disclaimer */}
-        <div className="mt-12 text-center text-xs text-muted-foreground">
-          <hr className="my-4" />
-          <p>
-            <strong>Disclaimer:</strong> This content is scraped from Reddit.
-            All interview experiences and posts belong to their respective
-            Reddit users and are not my own.
-          </p>
         </div>
       </div>
       <Analytics />

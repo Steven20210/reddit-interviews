@@ -90,19 +90,8 @@ COMPANIES = [
 
 QUERIES = [
     # Company-specific interview experience queries
-    "amazon"
-    # *[f'"{company} interview" experience' for company in COMPANIES],
-    # # General interview experience queries (keeping some original ones)
-    # '(title:"interview" OR title:"experience") AND title:(oa OR onsite OR final OR phone OR screening)',
-    # '(title:"interview" OR title:"experience") AND title:(oa OR hackerrank OR leetcode OR coding)',
-    # '(title:"interview" OR title:"experience") AND title:("system design" OR architecture OR hld OR lld)',
-    # '(title:"interview" OR title:"experience") AND title:(behavioral OR "leadership principles" OR hr OR recruiter)',
-    # '(title:"interview" OR title:"experience") AND title:(intern OR internship OR "new grad" OR campus)',
-    # '(title:"interview" OR title:"experience") AND title:(phone OR recruiter OR screening OR first OR initial)',
-    # '(title:"interview" OR title:"experience") AND title:(onsite OR "final round" OR panel OR loop)',
-    # '(title:"interview" OR title:"experience") AND title:(round OR screening OR final OR onsite OR oa OR phone) -AM -trading -crypto',
-    # '(title:"interview" OR title:"experience") AND title:(SDE OR engineer OR "software dev" OR "data engineer")',
-    # 'title:(interview OR experience OR onsite OR oa OR "phone screen" OR "final round")'
+    "Apple", "Google", "Meta", "Amazon", "Microsoft", "Netflix", "Tesla",
+    '(title:"interview" OR title:"experience") AND title:(oa OR onsite OR final OR phone OR screening)',
 ]
 
 # for company in COMPANIES:
