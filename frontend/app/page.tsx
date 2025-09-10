@@ -144,6 +144,43 @@ export function SearchableSelect({
     </div>
   );
 }
+interface InterviewDetailsProps {
+  summary: string;
+}
+
+const InterviewDetails: React.FC<InterviewDetailsProps> = ({ summary }) => {
+  const formatLine = (line: string) => {
+    const cleanedLine = line.replace(/\*\*([^*]+)\*\*/g, (_, match) =>
+      match.trim()
+    );
+
+    const colonIndex = cleanedLine.indexOf(":");
+    if (colonIndex === -1) return cleanedLine; // No colon, just return
+
+    const key = cleanedLine.slice(0, colonIndex).trim();
+    const value = cleanedLine.slice(colonIndex + 1).trim();
+
+    // Temporary rule: don't bold if key has more than 3 words or line ends with colon
+    if (key.split(" ").length > 3 && cleanedLine.endsWith(":")) {
+      return cleanedLine;
+    }
+
+    return (
+      <>
+        <strong>{key}:</strong> {value}
+      </>
+    );
+  };
+
+  return (
+    <div className="text-muted-foreground whitespace-pre-line text-sm leading-relaxed">
+      {summary.split("\n").map((line, idx) => (
+        <div key={idx}>{formatLine(line)}</div>
+      ))}
+    </div>
+  );
+};
+
 // ---------------------------------------------
 // Component
 // ---------------------------------------------
@@ -300,7 +337,9 @@ export default function InterviewSearchPage() {
                     terms of service and API usage guidelines. The information
                     provided may not be accurate, complete, or up-to-date.
                     Always verify information from official sources and consult
-                    with professionals for career advice.
+                    with professionals for career advice. This content is
+                    scraped from Reddit. All interview experiences and posts
+                    belong to their respective Reddit users and are not my own.
                   </p>
                 </div>
               </div>
@@ -366,6 +405,7 @@ export default function InterviewSearchPage() {
               Showing {(posts ?? []).length} posts (page {currentPage} of{" "}
               {totalPages})
             </p>
+
             {totalPages > 1 && (
               <div className="flex items-center space-x-2">
                 {/* Prev button */}
@@ -377,16 +417,20 @@ export default function InterviewSearchPage() {
                   Prev
                 </button>
 
-                {/* Page number sliding window */}
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter((pageNum) => {
-                    // Sliding window of 3 pages around currentPage
-                    return (
-                      pageNum >= Math.max(1, currentPage - 1) &&
-                      pageNum <= Math.min(totalPages, currentPage + 1)
-                    );
-                  })
-                  .map((pageNum) => (
+                {/* Page number sliding window (3 pages) */}
+                {(() => {
+                  let startPage = Math.max(1, currentPage - 1);
+                  let endPage = startPage + 2;
+
+                  if (endPage > totalPages) {
+                    endPage = totalPages;
+                    startPage = Math.max(1, endPage - 2);
+                  }
+
+                  return Array.from(
+                    { length: endPage - startPage + 1 },
+                    (_, i) => startPage + i
+                  ).map((pageNum) => (
                     <button
                       key={pageNum}
                       onClick={() => setCurrentPage(pageNum)}
@@ -398,7 +442,8 @@ export default function InterviewSearchPage() {
                     >
                       {pageNum}
                     </button>
-                  ))}
+                  ));
+                })()}
 
                 {/* Next button */}
                 <button
@@ -473,7 +518,7 @@ export default function InterviewSearchPage() {
                             Summary
                           </h3>
                           <div className="text-muted-foreground whitespace-pre-line text-sm leading-relaxed">
-                            {parseBoldPatterns(post.summary)}
+                            <InterviewDetails summary={post.summary} />
                           </div>
                         </div>
 
@@ -508,16 +553,6 @@ export default function InterviewSearchPage() {
               })
             )}
           </div>
-        </div>
-
-        {/* Footer Disclaimer */}
-        <div className="mt-12 text-center text-xs text-muted-foreground">
-          <hr className="my-4" />
-          <p>
-            <strong>Disclaimer:</strong> This content is scraped from Reddit.
-            All interview experiences and posts belong to their respective
-            Reddit users and are not my own.
-          </p>
         </div>
       </div>
       <Analytics />

@@ -24,10 +24,8 @@ class Post(Document):
     @classmethod
     def upsert_post(cls, input_url: str, payload: dict, new_hash: str) -> bool:
         logging.info(f"Upserting post with URL: {input_url} and hash: {new_hash}")
-
         try:
             existing = cls.objects(url=input_url).first()
-            logging.info("ere")
             if existing:
                 if existing.hash != new_hash:
                     existing.hash = new_hash
