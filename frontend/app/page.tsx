@@ -1,25 +1,11 @@
 "use client";
 import { Analytics } from "@vercel/analytics/next";
 import { useEffect, useState } from "react";
-import {
-  Search,
-  Building2,
-  Briefcase,
-  ExternalLink,
-  RefreshCw,
-} from "lucide-react";
+import { Search, Building2, Briefcase, ExternalLink } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { set } from "date-fns";
 import { Check, ChevronsUpDown } from "lucide-react";
 import {
   Command,

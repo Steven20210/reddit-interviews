@@ -55,47 +55,12 @@ LEETCODE_PATTERN = re.compile(r"""
 )\b
 """, re.IGNORECASE | re.VERBOSE)
 
-# Major tech companies for interview experience searches
-COMPANIES = [
-    # FAANG+ Companies
-    # "Apple", "Google", "Meta", "Amazon", "Microsoft", "Netflix", "Tesla",
-    
-    # Cloud & Enterprise Software
-    # "Salesforce", "Oracle", "Adobe"
-    
-    # # AI & Data
-    # "Palantir"
-    
-    # # Social Media & Communication
-    # "Twitter", "LinkedIn", "Snapchat", "Discord", "Slack", "Zoom",
-    
-    # # E-commerce & Fintech
-    "Shopify", "Stripe", "Square", "PayPal", "DoorDash", "Instacart", "Airbnb",
-    
-    # # Gaming & Entertainment
-    # "Roblox", "Unity", "Epic Games", "Twitch", "Spotify", "Pinterest",
-    
-    # # Hardware & Semiconductor
-    # "Intel", "NVIDIA", "AMD", "Qualcomm", "Cisco", "IBM",
-    
-    # # Developer Tools & Platforms
-    # "GitHub", "GitLab", "Hashicorp", "Docker", "JetBrains", "Stack Overflow",
-    
-    # # Emerging Tech
-    # "SpaceX", "Coinbase", "Robinhood", "Uber",
-    
-    # # Chinese Tech Giants
-    # "Alibaba", "Tencent", "Baidu", "ByteDance"
-]
-
 QUERIES = [
     # Company-specific interview experience queries
     "Apple", "Google", "Meta", "Amazon", "Microsoft", "Netflix", "Tesla",
     '(title:"interview" OR title:"experience") AND title:(oa OR onsite OR final OR phone OR screening)',
 ]
 
-# for company in COMPANIES:
-#     QUERIES.append(f"{company} interview experience")
 
 def get_reddit_instance():
     return praw.Reddit(

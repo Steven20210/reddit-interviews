@@ -5,10 +5,8 @@ import json
 import logging
 import time
 from azure.storage.queue import QueueClient
-from db.handlers import SummarizedPost, CompanyMetadata, Post
-from mongoengine import get_connection, connect, register_connection
+from db.handlers import SummarizedPost, CompanyMetadata
 import hashlib
-import pymongo
 import re
 from typing import Tuple
 logging.basicConfig(
@@ -16,7 +14,6 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[logging.StreamHandler()]
 )
-from pymongo import MongoClient
 
 load_dotenv()
 logging.info("Loaded environment variables from .env")
@@ -121,7 +118,7 @@ def summarize_post_with_comments(post_data: dict):
     # Use the new comment-aware extraction function
     summary = extract_interview_summary_with_comments(post_data)
     
-    if summary in [None, "None", "None \n"]:
+    if summary and re.search(r"Summary:\s*None\b", summary, re.IGNORECASE | re.MULTILINE):
         logging.warning("No summary returned for post.")
         return 
     
@@ -191,5 +188,3 @@ def migrate_old_data():
         company, role = extract_company_and_role(post_data["summary"])
         SummarizedPost.upsert_post(post_data["url"], post_data["summary"], post_data["raw"], hashlib.sha256(json.dumps(post_data, sort_keys=True).encode("utf-8")).hexdigest(), role, company)
         CompanyMetadata.upsert_metadata(company, role)
-
-        
