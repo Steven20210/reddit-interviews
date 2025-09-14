@@ -4,7 +4,6 @@ import json, os
 from typing import Callable
 from dotenv import load_dotenv
 from azure.core.exceptions import ResourceExistsError
-import logging 
 
 def ensure_queue_exists(conn_str: str, queue_name: str) -> QueueClient:
     """
@@ -61,5 +60,4 @@ def consume_messages(queue_client, callback: Callable[[Post], None], batch_size:
 
         except Exception as e:
             print(f"Error processing message: {e}")
-            # Don't delete the message; it will reappear after visibility timeout
     

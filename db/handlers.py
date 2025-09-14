@@ -1,6 +1,4 @@
 from mongoengine import connect, Document, StringField, DictField, BooleanField, ListField, get_connection
-from mongoengine.errors import NotUniqueError
-from typing import List
 import logging 
 import os
 from dotenv import load_dotenv
