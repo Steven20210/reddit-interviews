@@ -154,7 +154,7 @@ venv\Scripts\activate  # Windows
 source venv/bin/activate  # macOS/Linux
 
 # Run the server
-python run_server.py
+python -m backend.app
 ```
 
 The backend will be available at:
