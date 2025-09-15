@@ -1,4 +1,4 @@
-from mongoengine import connect, Document, StringField, DictField, BooleanField, ListField, get_connection
+from mongoengine import connect, Document, StringField, DictField, BooleanField, ListField, IntField
 import logging 
 import os
 from dotenv import load_dotenv
@@ -48,7 +48,8 @@ class SummarizedPost(Document):
     summary = StringField(required=True)
     raw_post = StringField(required=True)
     payload = DictField(required=False)
-
+    timestamp = IntField(required=True)
+    
     meta = {
         'collection': 'summarized_posts',
         'indexes': [
@@ -57,7 +58,7 @@ class SummarizedPost(Document):
     }
 
     @classmethod
-    def upsert_post(cls, url: str, summary: str, raw_post: str, new_hash: str, role: str, company: str) -> None:
+    def upsert_post(cls, url: str, summary: str, raw_post: str, new_hash: str, role: str, company: str, timestamp: int) -> None:
         existing = cls.objects(url=url).first()
         if existing:
             if existing.hash != new_hash:
@@ -70,7 +71,7 @@ class SummarizedPost(Document):
                 return False
         else:
             logging.info(f"Upserting summarized post with URL: {url} and hash: {new_hash}")
-            cls(url=url, hash=new_hash, summary=summary, raw_post=raw_post, role=role, company=company).save()
+            cls(url=url, hash=new_hash, summary=summary, raw_post=raw_post, role=role, company=company, timestamp=timestamp).save()
             print(f"Inserted new summarized post: {url}")
         return True
 class CompanyMetadata(Document):

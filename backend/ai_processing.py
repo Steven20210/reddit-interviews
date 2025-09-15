@@ -68,21 +68,22 @@ def extract_interview_summary_with_comments(post_data):
     
     prompt = f"""Extract interview experience info from Reddit posts/comments.
 
-Rules:
-- If post has detailed experience → summarize it
-- If post is a question → include useful experience from comments
-- If no useful info → return "None"
-- Always include Company and Role (use "Unknown Company"/"Unknown role" if missing)
-- Focus on rounds, example questions, difficulty, tips
-- Ignore generic/non-specific advice
+    Rules:
+    - Only summarize posts that contain **actual interview experience**.
+    - If the post is a **generic question** (asking for advice, resources, or tips) with no concrete experience, return "None".
+    - If post has detailed experience → summarize it.
+    - If post is a question with useful experience in comments → summarize only the useful experience from comments.
+    - Always include Company and Role (use "Unknown Company"/"Unknown role" if missing).
+    - Focus on rounds, example questions, difficulty, tips.
+    - Ignore generic/non-specific advice, advice on resources, or prep strategies that don't describe a real interview.
 
-Format:
-Company: <...>
-Role: <...>
-Summary:
+    Format:
+    Company: <...>
+    Role: <...>
+    Summary:
 
-CONTENT:
-{full_content}"""
+    CONTENT:
+    {full_content}"""
     
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -118,7 +119,7 @@ def summarize_post_with_comments(post_data: dict):
     # Use the new comment-aware extraction function
     summary = extract_interview_summary_with_comments(post_data)
     
-    if summary and re.search(r"Summary:\s*None\b", summary, re.IGNORECASE | re.MULTILINE):
+    if summary and re.search(r"Summary:\s*None\s*(?:\n|$)", summary, re.IGNORECASE) or re.search(r"None", summary, re.IGNORECASE):
         logging.warning("No summary returned for post.")
         return 
     
@@ -137,7 +138,7 @@ def summarize_post_with_comments(post_data: dict):
     }
     company, role = extract_company_and_role(summary)    
     CompanyMetadata.upsert_metadata(company, role)
-    SummarizedPost.upsert_post(entry["url"], summary, raw_post, hashlib.sha256(json.dumps(entry, sort_keys=True).encode("utf-8")).hexdigest(), role, company)
+    SummarizedPost.upsert_post(entry["url"], summary, raw_post, hashlib.sha256(json.dumps(entry, sort_keys=True).encode("utf-8")).hexdigest(), role, company, entry["timestamp"])
 
 def create_summaries_for_all_posts(queue_client: QueueClient):
     logging.info(f"Dequeuing Reddit Posts.")

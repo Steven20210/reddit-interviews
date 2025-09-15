@@ -9,6 +9,8 @@ import hashlib
 from aqs.queue_handlers import enqueue_post, ensure_queue_exists
 from db.handlers import Post, SummarizedPost
 import logging
+from urllib.parse import urlparse
+
 load_dotenv()
 
 REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
@@ -122,3 +124,65 @@ def fetch_and_store_posts(time_filter):
                 enqueue_post(queue_client, Post, post.url, post_data, hashlib.sha256(json.dumps(post_data, sort_keys=True).encode("utf-8")).hexdigest())
     create_summaries_for_all_posts(queue_client)
 
+
+
+def is_reddit_submission_url(url: str) -> bool:
+    """
+    Returns True only if the URL looks like a Reddit submission (post) URL.
+    """
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        if "reddit.com" not in parsed.netloc:
+            return False
+
+        # Path should contain /r/.../comments/...
+        path_parts = parsed.path.strip("/").split("/")
+        if len(path_parts) < 4:
+            return False
+        if path_parts[0] != "r" or path_parts[2] != "comments":
+            return False
+
+        return True
+    except:
+        return False
+    
+def remove_deleted_posts():
+    reddit = get_reddit_instance()
+    all_posts = Post.objects()  
+    all_summarized_posts = SummarizedPost.objects()
+
+    # Example: print them
+    for doc in all_summarized_posts:
+        url = doc.url
+        if not is_reddit_submission_url(url):
+            doc.delete()
+            logging.info(f"SummarizedPost deleted: {url} due to invalid url, removed from DB.")
+            continue
+        post = reddit.submission(url=url)
+        if post.selftext == '[deleted]' or post.title == '[deleted]':
+            doc.delete()
+            logging.info(f"SummarizedPost deleted: {url}, removed from DB.")
+    
+    for doc in all_posts:
+        url = doc.url
+        if not is_reddit_submission_url(url):
+            doc.delete()
+            logging.info(f"Post deleted: {url} due to invalid url, removed from DB.")
+            continue
+        post = reddit.submission(url=url)
+        if post.selftext == '[deleted]' or post.title == '[deleted]':
+            Post.objects(url=url).delete()
+            logging.info(f"Post deleted: {url}, removed from DB.")
+
+def remove_none_posts(): 
+    all_summarized_posts = SummarizedPost.objects()
+    for doc in all_summarized_posts:
+        if re.search(r"None", doc.summary, re.IGNORECASE):
+            doc.delete()
+            logging.info(f"SummarizedPost deleted: {doc.url} due to 'None', removed from DB.")
+
+
+if __name__ == "__main__":
+    remove_none_posts()
