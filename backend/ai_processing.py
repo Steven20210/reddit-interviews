@@ -65,22 +65,30 @@ def extract_interview_summary_with_comments(post_data):
             comment_content += f"\nComment {i}:\n{comment.get('body', '')}\n"
     
     full_content = post_content + comment_content
-    
-    prompt = f"""Extract interview experience info from Reddit posts/comments.
+
+    prompt = f"""Extract **high-quality interview experience info** from Reddit posts/comments.
 
     Rules:
-    - Only summarize posts that contain **actual interview experience**.
-    - If the post is a **generic question** (asking for advice, resources, or tips) with no concrete experience, return "None".
-    - If post has detailed experience → summarize it.
-    - If post is a question with useful experience in comments → summarize only the useful experience from comments.
-    - Always include Company and Role (use "Unknown Company"/"Unknown role" if missing).
-    - Focus on rounds, example questions, difficulty, tips.
-    - Ignore generic/non-specific advice, advice on resources, or prep strategies that don't describe a real interview.
+    1. Only summarize posts that contain **actual interview experience**, including:
+        - Interview rounds (phone, onsite, coding, system design, behavioral)
+        - Specific problems/questions asked
+        - Variations, edge cases, or difficulty
+        - Candidate's approach, reasoning, and mistakes
+        - Feedback, outcome, or progression in the process
+    2. Do **not** summarize posts that are:
+        - Generic updates (e.g., “I submitted OA, waiting for response”)
+        - OA/test results without interview rounds
+        - Requests for advice, tips, or resources
+        - Broad/generalized experiences without concrete examples
+    3. If useful experience appears only in comments, summarize **only** that
+    4. Always include Company and Role (use "Unknown Company"/"Unknown role" if missing)
+    5. If a post does **not** meet the criteria for high-quality experience, return "None"
 
     Format:
-    Company: <...>
-    Role: <...>
+    Company: <Company Name>
+    Role: <Role>
     Summary:
+    <detailed summary of experience including rounds, questions, approaches, outcomes, tips>
 
     CONTENT:
     {full_content}"""
@@ -191,3 +199,62 @@ def migrate_old_data():
         SummarizedPost.upsert_post(post_data["url"], post_data["summary"], post_data["raw"], hashlib.sha256(json.dumps(post_data, sort_keys=True).encode("utf-8")).hexdigest(), role, company)
         CompanyMetadata.upsert_metadata(company, role)
 
+def remove_weak_content():
+    all_summarized_posts = SummarizedPost.objects()
+    for doc in all_summarized_posts:
+        prompt = f"""Extract **high-quality interview experience info** from Reddit posts/comments.
+
+        Rules:
+        1. Only summarize posts that contain **actual interview experience**, including:
+            - Interview rounds (phone, onsite, coding, system design, behavioral)
+            - Specific problems/questions asked
+            - Variations, edge cases, or difficulty
+            - Candidate's approach, reasoning, and mistakes
+            - Feedback, outcome, or progression in the process
+        2. Do **not** summarize posts that are:
+            - Generic updates (e.g., “I submitted OA, waiting for response”)
+            - OA/test results without interview rounds
+            - Requests for advice, tips, or resources
+            - Broad/generalized experiences without concrete examples
+        3. If useful experience appears only in comments, summarize **only** that
+        4. Always include Company and Role (use "Unknown Company"/"Unknown role" if missing)
+        5. If a post does **not** meet the criteria for high-quality experience, return "None"
+
+        Format:
+        Company: <Company Name>
+        Role: <Role>
+        Summary:
+        <detailed summary of experience including rounds, questions, approaches, outcomes, tips>
+
+        CONTENT:
+        {doc.raw_post}"""
+        
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "gemma2-9b-it",
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 2000,
+            "temperature": 0.2
+        }
+        logging.info("Sending request to Groq API for interview summary extraction with comments this test LIT.")
+        try:
+            response = requests.post(url, headers=headers, data=json.dumps(payload))
+            response.raise_for_status()
+            logging.info("Received response from Groq API.")
+            summary = response.json()["choices"][0]["message"]["content"]
+            if summary and re.search(r"Summary:\s*None\s*(?:\n|$)", summary, re.IGNORECASE) or re.search(r"None", summary, re.IGNORECASE):
+                logging.warning("No summary returned for post: " + doc.url)
+                doc.delete()
+                continue 
+            time.sleep(3)  # Sleep to avoid hitting API rate limits
+
+        except requests.RequestException as e:
+            logging.error(f"Groq API request failed: {e}")
+            return None
+
+if __name__ == "__main__":
+    remove_weak_content()
