@@ -89,7 +89,7 @@ class SearchRequest(BaseModel):
 async def root(request: Request):
     return {"message": "InterviewsDB API is running"}
 
-@limiter.limit("30/minute")
+@limiter.limit("10/minute")
 @app.get("/token")
 def get_token(request: Request):
     token = make_ephemeral_token()
@@ -117,7 +117,7 @@ def search(request: Request, search_request: SearchRequest, token: str = Depends
     if search_request.query:
         sanitized_query = sanitize_regex_input(search_request.query)
         filter_query["$or"] = [
-            {"raw": {"$regex": sanitized_query, "$options": "i"}},
+            {"raw_post": {"$regex": sanitized_query, "$options": "i"}},
             {"summary": {"$regex": sanitized_query, "$options": "i"}}
         ]
         

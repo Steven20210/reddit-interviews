@@ -35,6 +35,7 @@ interface InterviewPost {
   url: string;
   company?: string;
   role?: string;
+  timestamp?: number;
 }
 
 type ApiResponse = {
@@ -236,6 +237,8 @@ export default function InterviewSearchPage() {
         url: item.url ?? "#",
         company: item.company ?? "Unknown",
         role: item.role ?? "Unknown",
+        timestamp:
+          typeof item.timestamp === "number" ? item.timestamp : undefined,
       }));
       setCompanies(data.companies || []);
       setRoles(data.roles || []);
@@ -517,7 +520,7 @@ export default function InterviewSearchPage() {
                   >
                     <CardHeader>
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <Badge
                             variant="secondary"
                             className="flex items-center gap-1"
@@ -532,6 +535,12 @@ export default function InterviewSearchPage() {
                             <Briefcase className="h-3 w-3" />
                             {post.role || "Unknown"}
                           </Badge>
+                          {post.timestamp ? (
+                            <span className="inline-flex items-center text-xs text-muted-foreground ml-2">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {new Date(post.timestamp * 1000).toLocaleString()}
+                            </span>
+                          ) : null}
                         </div>
                         <Button variant="ghost" size="sm" asChild>
                           <a
