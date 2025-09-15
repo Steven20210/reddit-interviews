@@ -294,11 +294,6 @@ export default function InterviewSearchPage() {
                 </h1>
               </div>
               <div className="mb-2 flex items-center justify-center gap-2">
-                <img
-                  src="https://www.redditstatic.com/desktop2x/img/favicon/apple-icon-57x57.png"
-                  alt="Reddit Logo"
-                  className="h-6 w-6"
-                />
                 <span className="text-orange-500 text-lg font-semibold">
                   sourced from Reddit
                 </span>

@@ -2,7 +2,7 @@ import azure.functions as func
 import datetime
 import json
 import logging
-from backend.reddit_collector import fetch_and_store_posts
+from backend.reddit_collector import fetch_and_store_posts, remove_deleted_posts
 import requests
 app = func.FunctionApp()
 
@@ -12,4 +12,6 @@ def ScrapeRedditJob(myTimer: func.TimerRequest) -> None:
         logging.info('The timer is past due!')
     logging.info("Starting Reddit scraping job")
     fetch_and_store_posts(time_filter='day')  # fetches this day's posts
+    logging.info("Cleaning up deleted posts")
+    remove_deleted_posts()
     logging.info('Python timer trigger function executed.')
