@@ -176,5 +176,13 @@ def remove_deleted_posts():
             Post.objects(url=url).delete()
             logging.info(f"Post deleted: {url}, removed from DB.")
 
+def remove_none_posts(): 
+    all_summarized_posts = SummarizedPost.objects()
+    for doc in all_summarized_posts:
+        if re.search(r"None", doc.summary, re.IGNORECASE):
+            doc.delete()
+            logging.info(f"SummarizedPost deleted: {doc.url} due to 'None', removed from DB.")
+
+
 if __name__ == "__main__":
-    remove_deleted_posts()
+    remove_none_posts()

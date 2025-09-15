@@ -119,7 +119,7 @@ def summarize_post_with_comments(post_data: dict):
     # Use the new comment-aware extraction function
     summary = extract_interview_summary_with_comments(post_data)
     
-    if summary and re.search(r"Summary:\s*None\s*$", summary, re.IGNORECASE | re.MULTILINE):
+    if summary and re.search(r"Summary:\s*None\s*(?:\n|$)", summary, re.IGNORECASE) or re.search(r"None", summary, re.IGNORECASE):
         logging.warning("No summary returned for post.")
         return 
     
