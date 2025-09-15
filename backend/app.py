@@ -117,7 +117,7 @@ def search(request: Request, search_request: SearchRequest, token: str = Depends
     if search_request.query:
         sanitized_query = sanitize_regex_input(search_request.query)
         filter_query["$or"] = [
-            {"raw": {"$regex": sanitized_query, "$options": "i"}},
+            {"raw_post": {"$regex": sanitized_query, "$options": "i"}},
             {"summary": {"$regex": sanitized_query, "$options": "i"}}
         ]
         
