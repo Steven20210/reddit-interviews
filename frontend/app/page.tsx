@@ -1,7 +1,13 @@
 "use client";
 import { Analytics } from "@vercel/analytics/next";
 import { useEffect, useState } from "react";
-import { Search, Building2, Briefcase, ExternalLink } from "lucide-react";
+import {
+  Search,
+  Building2,
+  Briefcase,
+  ExternalLink,
+  Clock,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -67,6 +73,7 @@ type SearchableSelectProps = {
   value: string;
   onChange: (val: string) => void;
   icon?: React.ReactNode;
+  displayValue?: string;
 };
 
 export function SearchableSelect({
@@ -75,6 +82,7 @@ export function SearchableSelect({
   value,
   onChange,
   icon,
+  displayValue,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
 
@@ -85,7 +93,7 @@ export function SearchableSelect({
           <button className="inline-flex items-center justify-between rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-auto max-w-xs whitespace-normal break-words">
             {icon}
             <span className="ml-2 text-left">
-              {value === "all" ? `All ${label}s` : value}
+              {displayValue || (value === "all" ? `All ${label}s` : value)}
             </span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </button>
@@ -174,6 +182,7 @@ export default function InterviewSearchPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [companyFilter, setCompanyFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [sortOrder, setSortOrder] = useState("desc");
   const [posts, setPosts] = useState<InterviewPost[]>([]);
   const [companies, setCompanies] = useState<string[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
@@ -214,6 +223,7 @@ export default function InterviewSearchPage() {
             role: roleFilter,
             page: page,
             limit: 10,
+            sort_order: sortOrder,
           }),
         }
       );
@@ -260,7 +270,7 @@ export default function InterviewSearchPage() {
   useEffect(() => {
     fetchPosts();
     setCurrentPage(1); // reset page on new search
-  }, [companyFilter, roleFilter]);
+  }, [companyFilter, roleFilter, sortOrder]);
 
   // ---------------------------------------------
   // UI
@@ -369,12 +379,56 @@ export default function InterviewSearchPage() {
                     />
                   </div>
 
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-medium">Sort by:</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="inline-flex items-center justify-between rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-auto max-w-xs whitespace-normal break-words">
+                          <Clock className="h-4 w-4" />
+                          <span className="ml-2 text-left">
+                            {sortOrder === "desc" ? "Newest" : "Oldest"}
+                          </span>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[200px] p-0">
+                        <Command>
+                          <CommandList>
+                            <CommandGroup>
+                              <CommandItem
+                                onSelect={() => {
+                                  setSortOrder("desc");
+                                }}
+                              >
+                                Newest
+                                {sortOrder === "desc" ? (
+                                  <Check className="ml-auto h-4 w-4" />
+                                ) : null}
+                              </CommandItem>
+                              <CommandItem
+                                onSelect={() => {
+                                  setSortOrder("asc");
+                                }}
+                              >
+                                Oldest
+                                {sortOrder === "asc" ? (
+                                  <Check className="ml-auto h-4 w-4" />
+                                ) : null}
+                              </CommandItem>
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
                   <Button
                     variant="outline"
                     onClick={() => {
                       setSearchQuery("");
                       setCompanyFilter("all");
                       setRoleFilter("all");
+                      setSortOrder("desc");
                     }}
                     className="h-10"
                   >

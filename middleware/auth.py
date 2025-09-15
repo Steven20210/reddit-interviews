@@ -1,13 +1,15 @@
 # auth_tokens.py
-import time, hmac, hashlib, base64, os
+import time, hmac, hashlib, base64, os, logging
 from typing import Tuple
 from fastapi import Request, HTTPException, Depends
 from dotenv import load_dotenv
+from starlette.middleware.base import BaseHTTPMiddleware
+
 load_dotenv()
 
 SECRET = os.getenv("HMAC_SECRET")  # store in env, not in code
 TTL = 60  # 60 seconds
-
+    
 def make_ephemeral_token(TTL: int = TTL) -> str:
     ts = int(time.time())
     payload = f"{ts}:{TTL}".encode("utf-8")
@@ -41,7 +43,8 @@ def verify_ephemeral_token(token: str):
         return True, "valid"
 
     except Exception as e:
-        return False, f"invalid token: {e}"
+        logging.error(f"Token verification failed: {type(e).__name__}")
+        return False, "invalid token"
 
 def get_token_from_header(request: Request):
     auth = request.headers.get("Authorization")

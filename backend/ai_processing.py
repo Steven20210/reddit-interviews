@@ -132,7 +132,8 @@ def summarize_post_with_comments(post_data: dict):
         "subreddit": post_data.get("subreddit", ""),
         "author": post_data.get("author", ""),
         "num_comments": post_data.get("num_comments", 0),
-        "comments": post_data.get("comments", [])
+        "comments": post_data.get("comments", []),
+        "timestamp": post_data.get("created_utc", 9999999999)
     }
     company, role = extract_company_and_role(summary)    
     CompanyMetadata.upsert_metadata(company, role)
@@ -188,3 +189,4 @@ def migrate_old_data():
         company, role = extract_company_and_role(post_data["summary"])
         SummarizedPost.upsert_post(post_data["url"], post_data["summary"], post_data["raw"], hashlib.sha256(json.dumps(post_data, sort_keys=True).encode("utf-8")).hexdigest(), role, company)
         CompanyMetadata.upsert_metadata(company, role)
+
