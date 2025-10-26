@@ -99,7 +99,7 @@ def extract_interview_summary_with_comments(post_data):
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "llama-3.1-8b-instant",
+        "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 2000,
         "temperature": 0.2
